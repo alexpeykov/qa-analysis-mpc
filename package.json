@@ -1,0 +1,30 @@
+{
+  "name": "QA-Core",
+  "version": "0.1.0",
+  "description": "Helper for QA-Core team",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "QA-Core": "./build/index.js"
+  },
+  "files": [
+    "build"
+  ],
+  "scripts": {
+    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
+    "prepare": "npm run build",
+    "watch": "tsc --watch",
+    "inspector": "npx @modelcontextprotocol/inspector build/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "0.6.0",
+    "axios": "^1.13.2",
+    "mysql2": "^3.15.3",
+    "ssh2": "^1.17.0",
+    "tunnel-ssh": "^5.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "typescript": "^5.3.3"
+  }
+}

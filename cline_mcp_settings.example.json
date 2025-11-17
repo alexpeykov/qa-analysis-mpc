@@ -1,0 +1,35 @@
+{
+  "mcpServers": {
+    "qa-analysis-server": {
+      "command": "node",
+      "args": ["/absolute/path/to/qa-analysis-server/build/index.js"],
+      "env": {
+        "JIRA_URL": "https://jira.your-company.net",
+        "JIRA_EMAIL": "your.email@company.com",
+        "JIRA_API_TOKEN": "your_jira_api_token_here",
+        "GITLAB_URL": "https://gitlab.your-company.net",
+        "GITLAB_TOKEN": "your_gitlab_token_here",
+        "TESTRAIL_URL": "https://testrail.your-company.net",
+        "TESTRAIL_EMAIL": "your.email@company.com",
+        "TESTRAIL_API_KEY": "your_testrail_api_key_here",
+        "MYSQL_HOST": "your-db-host.docker",
+        "MYSQL_PORT": "3306",
+        "MYSQL_DATABASE": "gateway",
+        "MYSQL_USER": "app",
+        "MYSQL_PASSWORD": "your_password",
+        "EVP_LT_HOST": "your-evplt-host.docker",
+        "EVP_LT_PORT": "3306",
+        "EVP_LT_DATABASE": "evp_lt",
+        "EVP_LT_USER": "app",
+        "EVP_LT_PASSWORD": "your_password",
+        "USE_SSH_TUNNEL": "true",
+        "SSH_HOST": "10.0.0.1",
+        "SSH_PORT": "22",
+        "SSH_USER": "ubuntu",
+        "SSH_KEY_PATH": "/absolute/path/to/.ssh/id_rsa"
+      },
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}
