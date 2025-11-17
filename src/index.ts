@@ -17,6 +17,7 @@ import axios, { AxiosInstance } from "axios";
 import mysql from "mysql2/promise";
 import { createTunnel } from "tunnel-ssh";
 import fs from "fs";
+import { marked } from "marked";
 
 // Environment variables for credentials
 const JIRA_URL = process.env.JIRA_URL;
@@ -505,6 +506,28 @@ class QAAnalysisServer {
             required: ["table_name"],
           },
         },
+        {
+          name: "convert_markdown_to_html",
+          description: "Convert Markdown content to HTML format. Supports standard Markdown syntax including headers, lists, code blocks, tables, links, images, and more.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              markdown: {
+                type: "string",
+                description: "Markdown content to convert to HTML",
+              },
+              include_css: {
+                type: "boolean",
+                description: "Whether to include basic CSS styling (default: false)",
+              },
+              sanitize: {
+                type: "boolean",
+                description: "Whether to sanitize HTML output (default: true)",
+              },
+            },
+            required: ["markdown"],
+          },
+        },
       ],
     }));
 
@@ -549,6 +572,8 @@ class QAAnalysisServer {
             return await this.describeTable(request.params.arguments);
           case "get_table_data":
             return await this.getTableData(request.params.arguments);
+          case "convert_markdown_to_html":
+            return await this.convertMarkdownToHtml(request.params.arguments);
           default:
             throw new McpError(
               ErrorCode.MethodNotFound,
@@ -1413,6 +1438,187 @@ class QAAnalysisServer {
     } finally {
       await connection.end();
     }
+  }
+
+  // Markdown to HTML Conversion
+
+  private async convertMarkdownToHtml(args: any) {
+    const markdown = String(args.markdown);
+    const includeCss = Boolean(args.include_css ?? false);
+    const sanitize = Boolean(args.sanitize ?? true);
+
+    try {
+      // Configure marked options
+      marked.setOptions({
+        gfm: true, // GitHub Flavored Markdown
+        breaks: true, // Convert \n to <br>
+      });
+
+      // Convert markdown to HTML
+      let html = await marked.parse(markdown);
+
+      // Sanitize HTML if requested (basic sanitization)
+      if (sanitize) {
+        html = this.sanitizeHtml(html);
+      }
+
+      // Add CSS if requested
+      if (includeCss) {
+        html = this.wrapHtmlWithCss(html);
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              success: true,
+              html: html,
+              original_length: markdown.length,
+              html_length: html.length,
+              options: {
+                include_css: includeCss,
+                sanitize: sanitize,
+              }
+            }, null, 2),
+          },
+        ],
+      };
+    } catch (error: any) {
+      throw new McpError(
+        ErrorCode.InternalError,
+        `Markdown conversion error: ${error.message}`
+      );
+    }
+  }
+
+  private sanitizeHtml(html: string): string {
+    // Basic HTML sanitization - remove potentially dangerous tags and attributes
+    // Note: For production use, consider using a library like DOMPurify
+    let sanitized = html;
+    
+    // Remove script tags
+    sanitized = sanitized.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    
+    // Remove inline event handlers
+    sanitized = sanitized.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '');
+    sanitized = sanitized.replace(/\s*on\w+\s*=\s*[^\s>]*/gi, '');
+    
+    // Remove javascript: protocols
+    sanitized = sanitized.replace(/javascript:/gi, '');
+    
+    return sanitized;
+  }
+
+  private wrapHtmlWithCss(html: string): string {
+    const css = `
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+    background: #fff;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    margin-top: 24px;
+    margin-bottom: 16px;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+  h1 { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+  h2 { font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: 0.875em; }
+  h6 { font-size: 0.85em; color: #6a737d; }
+  p { margin-bottom: 16px; }
+  a { color: #0366d6; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    padding: 0.2em 0.4em;
+    margin: 0;
+    font-size: 85%;
+    background-color: rgba(27,31,35,0.05);
+    border-radius: 3px;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  }
+  pre {
+    padding: 16px;
+    overflow: auto;
+    font-size: 85%;
+    line-height: 1.45;
+    background-color: #f6f8fa;
+    border-radius: 6px;
+    margin-bottom: 16px;
+  }
+  pre code {
+    padding: 0;
+    background-color: transparent;
+    border-radius: 0;
+  }
+  blockquote {
+    padding: 0 1em;
+    color: #6a737d;
+    border-left: 0.25em solid #dfe2e5;
+    margin: 0 0 16px 0;
+  }
+  table {
+    border-spacing: 0;
+    border-collapse: collapse;
+    margin-bottom: 16px;
+    width: 100%;
+  }
+  table th, table td {
+    padding: 6px 13px;
+    border: 1px solid #dfe2e5;
+  }
+  table th {
+    font-weight: 600;
+    background-color: #f6f8fa;
+  }
+  table tr {
+    background-color: #fff;
+    border-top: 1px solid #c6cbd1;
+  }
+  table tr:nth-child(2n) {
+    background-color: #f6f8fa;
+  }
+  ul, ol {
+    padding-left: 2em;
+    margin-bottom: 16px;
+  }
+  li + li {
+    margin-top: 0.25em;
+  }
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+  hr {
+    height: 0.25em;
+    padding: 0;
+    margin: 24px 0;
+    background-color: #e1e4e8;
+    border: 0;
+  }
+</style>
+`;
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Converted Markdown</title>
+  ${css}
+</head>
+<body>
+${html}
+</body>
+</html>`;
   }
 
   async run() {

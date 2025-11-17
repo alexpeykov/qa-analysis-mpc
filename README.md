@@ -67,6 +67,31 @@ This MCP server provides tools for:
 
 ---
 
+### 📝 Markdown to HTML Converter
+
+Convert Markdown content to clean, styled HTML with optional CSS styling and sanitization.
+
+#### Tool
+- `convert_markdown_to_html` - Convert Markdown to HTML
+  - **Required:** `markdown` - Markdown content to convert
+  - **Optional:** `include_css` - Include GitHub-style CSS (default: false)
+  - **Optional:** `sanitize` - Sanitize HTML output for security (default: true)
+
+#### Features
+- ✅ GitHub Flavored Markdown (GFM) support
+- ✅ Tables, code blocks, lists, headers, links, images
+- ✅ Basic HTML sanitization (removes scripts, event handlers)
+- ✅ Optional GitHub-style CSS
+- ✅ Line breaks conversion
+
+**Example Usage:**
+```
+"Convert this markdown to HTML: # Hello\n\nThis is **bold**"
+"Convert this markdown to HTML with CSS: ## Test\n- Item 1\n- Item 2"
+```
+
+---
+
 ### 🗄️ MySQL Database Integration
 
 #### Supported Databases
@@ -550,6 +575,15 @@ Add to MCP settings file:
 | `analyze_test_plan` | `source`, `identifier` | - | Extract test plan |
 | `generate_test_ideas` | `jira_ticket_key`, `gitlab_project_id`, `gitlab_mr_iid` | `focus_areas` | Generate test ideas |
 | `generate_test_cases` | `jira_ticket_key`, `gitlab_project_id`, `gitlab_mr_iid` | `test_type` | Generate test cases |
+
+### Markdown Converter Tools
+| Tool | Required Parameters | Optional Parameters | Description |
+|------|-------------------|-------------------|-------------|
+| `convert_markdown_to_html` | `markdown` | `include_css`, `sanitize` | Convert Markdown to HTML |
+
+**Options:**
+- `include_css`: `true` or `false` (default: false) - Include GitHub-style CSS
+- `sanitize`: `true` or `false` (default: true) - Sanitize HTML output
 
 ---
 
