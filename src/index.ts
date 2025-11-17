@@ -80,7 +80,7 @@ class QAAnalysisServer {
   constructor() {
     this.server = new Server(
       {
-        name: "qa-analysis-server",
+        name: "qa-analysis-mcp",
         version: "0.1.0",
       },
       {
@@ -1511,99 +1511,408 @@ class QAAnalysisServer {
   }
 
   private wrapHtmlWithCss(html: string): string {
+    const currentDate = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    // Extract title from first h1 tag or use default
+    const titleMatch = html.match(/<h1[^>]*>(.*?)<\/h1>/i);
+    const documentTitle = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, '') : 'Test Analysis & Summary';
+    
+    // Generate table of contents from h2 headings
+    const toc = this.generateTableOfContents(html);
+
     const css = `
 <style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  line-height: 1.8;
+  color: #2c3e50;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+  min-height: 100vh;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 40px;
+  text-align: center;
+  border-bottom: 4px solid #5a67d8;
+}
+
+.header h1 {
+  font-size: 2.5em;
+  margin-bottom: 10px;
+  font-weight: 700;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+}
+
+.header .meta {
+  opacity: 0.9;
+  font-size: 1.1em;
+  margin-top: 10px;
+}
+
+.toc-container {
+  background: #f8f9fa;
+  border-left: 5px solid #667eea;
+  margin: 30px 40px;
+  padding: 25px 30px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.toc-container h2 {
+  color: #667eea;
+  margin-bottom: 15px;
+  font-size: 1.5em;
+  border-bottom: 2px solid #667eea;
+  padding-bottom: 10px;
+}
+
+.toc-list {
+  list-style: none;
+  padding: 0;
+}
+
+.toc-list li {
+  margin: 10px 0;
+  padding-left: 20px;
+  position: relative;
+}
+
+.toc-list li:before {
+  content: "▸";
+  position: absolute;
+  left: 0;
+  color: #667eea;
+  font-weight: bold;
+}
+
+.toc-list a {
+  color: #5a67d8;
+  text-decoration: none;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  display: block;
+  padding: 5px 10px;
+  border-radius: 4px;
+}
+
+.toc-list a:hover {
+  color: #764ba2;
+  background: #e9ecef;
+  padding-left: 15px;
+  transform: translateX(5px);
+}
+
+.content {
+  padding: 40px;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin-top: 30px;
+  margin-bottom: 20px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #2c3e50;
+}
+
+h1 {
+  font-size: 2.5em;
+  color: #667eea;
+  border-bottom: 3px solid #667eea;
+  padding-bottom: 15px;
+  margin-top: 0;
+}
+
+h2 {
+  font-size: 2em;
+  color: #5a67d8;
+  border-bottom: 2px solid #e9ecef;
+  padding-bottom: 12px;
+  padding-top: 40px;
+  margin-top: 50px;
+  position: relative;
+}
+
+h2:before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -40px;
+  right: -40px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #e9ecef, transparent);
+}
+
+h3 {
+  font-size: 1.5em;
+  color: #764ba2;
+  border-left: 4px solid #667eea;
+  padding-left: 15px;
+  margin-top: 25px;
+}
+
+h4 {
+  font-size: 1.25em;
+  color: #5a67d8;
+  margin-top: 20px;
+}
+
+h5 {
+  font-size: 1.1em;
+  color: #6c757d;
+}
+
+h6 {
+  font-size: 1em;
+  color: #6c757d;
+  font-style: italic;
+}
+
+p {
+  margin-bottom: 18px;
+  line-height: 1.8;
+}
+
+strong {
+  color: #667eea;
+  font-weight: 600;
+}
+
+a {
+  color: #667eea;
+  text-decoration: none;
+  border-bottom: 1px dotted #667eea;
+  transition: all 0.3s ease;
+}
+
+a:hover {
+  color: #764ba2;
+  border-bottom: 1px solid #764ba2;
+}
+
+code {
+  padding: 3px 8px;
+  margin: 0 2px;
+  font-size: 90%;
+  background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
+  color: #2d3436;
+  border-radius: 4px;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+pre {
+  padding: 20px;
+  overflow-x: auto;
+  font-size: 14px;
+  line-height: 1.6;
+  background: #2d3436;
+  color: #dfe6e9;
+  border-radius: 8px;
+  margin: 20px 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  border-left: 4px solid #667eea;
+}
+
+pre code {
+  padding: 0;
+  background: transparent;
+  color: #dfe6e9;
+  box-shadow: none;
+}
+
+blockquote {
+  padding: 15px 20px;
+  color: #6c757d;
+  border-left: 5px solid #667eea;
+  background: #f8f9fa;
+  margin: 20px 0;
+  border-radius: 0 6px 6px 0;
+  font-style: italic;
+}
+
+table {
+  border-spacing: 0;
+  border-collapse: collapse;
+  margin: 25px 0;
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+table th,
+table td {
+  padding: 12px 16px;
+  border: 1px solid #dee2e6;
+  text-align: left;
+}
+
+table th {
+  font-weight: 600;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  text-transform: uppercase;
+  font-size: 0.9em;
+  letter-spacing: 0.5px;
+}
+
+table tr {
+  background-color: white;
+  transition: all 0.3s ease;
+}
+
+table tr:nth-child(even) {
+  background-color: #f8f9fa;
+}
+
+table tr:hover {
+  background-color: #e9ecef;
+  transform: scale(1.01);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+ul, ol {
+  padding-left: 30px;
+  margin: 15px 0;
+}
+
+li {
+  margin: 8px 0;
+  line-height: 1.7;
+}
+
+li::marker {
+  color: #667eea;
+  font-weight: bold;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  margin: 20px 0;
+}
+
+hr {
+  height: 2px;
+  padding: 0;
+  margin: 40px 0;
+  background: linear-gradient(90deg, transparent, #667eea, transparent);
+  border: 0;
+}
+
+.section-divider {
+  margin: 60px 0;
+  height: 3px;
+  background: linear-gradient(90deg, #667eea, #764ba2, #667eea);
+  border-radius: 2px;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+/* Scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Back to top button */
+.back-to-top {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  transition: all 0.3s ease;
+  font-size: 24px;
+  border: none;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.back-to-top:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+}
+
+/* Print styles */
+@media print {
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    line-height: 1.6;
-    color: #333;
-    max-width: 900px;
-    margin: 0 auto;
+    background: white;
+    padding: 0;
+  }
+  
+  .container {
+    box-shadow: none;
+  }
+  
+  .back-to-top {
+    display: none;
+  }
+  
+  .toc-container {
+    page-break-after: always;
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  body {
+    padding: 10px;
+  }
+  
+  .header {
+    padding: 30px 20px;
+  }
+  
+  .header h1 {
+    font-size: 2em;
+  }
+  
+  .content {
     padding: 20px;
-    background: #fff;
   }
-  h1, h2, h3, h4, h5, h6 {
-    margin-top: 24px;
-    margin-bottom: 16px;
-    font-weight: 600;
-    line-height: 1.25;
+  
+  .toc-container {
+    margin: 20px;
+    padding: 20px;
   }
-  h1 { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
-  h2 { font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
-  h3 { font-size: 1.25em; }
-  h4 { font-size: 1em; }
-  h5 { font-size: 0.875em; }
-  h6 { font-size: 0.85em; color: #6a737d; }
-  p { margin-bottom: 16px; }
-  a { color: #0366d6; text-decoration: none; }
-  a:hover { text-decoration: underline; }
-  code {
-    padding: 0.2em 0.4em;
-    margin: 0;
-    font-size: 85%;
-    background-color: rgba(27,31,35,0.05);
-    border-radius: 3px;
-    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  
+  h2:before {
+    left: -20px;
+    right: -20px;
   }
-  pre {
-    padding: 16px;
-    overflow: auto;
-    font-size: 85%;
-    line-height: 1.45;
-    background-color: #f6f8fa;
-    border-radius: 6px;
-    margin-bottom: 16px;
-  }
-  pre code {
-    padding: 0;
-    background-color: transparent;
-    border-radius: 0;
-  }
-  blockquote {
-    padding: 0 1em;
-    color: #6a737d;
-    border-left: 0.25em solid #dfe2e5;
-    margin: 0 0 16px 0;
-  }
-  table {
-    border-spacing: 0;
-    border-collapse: collapse;
-    margin-bottom: 16px;
-    width: 100%;
-  }
-  table th, table td {
-    padding: 6px 13px;
-    border: 1px solid #dfe2e5;
-  }
-  table th {
-    font-weight: 600;
-    background-color: #f6f8fa;
-  }
-  table tr {
-    background-color: #fff;
-    border-top: 1px solid #c6cbd1;
-  }
-  table tr:nth-child(2n) {
-    background-color: #f6f8fa;
-  }
-  ul, ol {
-    padding-left: 2em;
-    margin-bottom: 16px;
-  }
-  li + li {
-    margin-top: 0.25em;
-  }
-  img {
-    max-width: 100%;
-    height: auto;
-  }
-  hr {
-    height: 0.25em;
-    padding: 0;
-    margin: 24px 0;
-    background-color: #e1e4e8;
-    border: 0;
-  }
+}
 </style>
 `;
 
@@ -1612,13 +1921,65 @@ class QAAnalysisServer {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Converted Markdown</title>
+  <title>${documentTitle}</title>
   ${css}
 </head>
 <body>
-${html}
+  <div class="container">
+    <div class="header">
+      <h1>🧪 ${documentTitle}</h1>
+      <div class="meta">Test Analysis & Summary Report</div>
+      <div class="meta">${currentDate}</div>
+    </div>
+    
+    ${toc}
+    
+    <div class="content">
+      ${html}
+    </div>
+  </div>
+  
+  <a href="#" class="back-to-top" title="Back to top">↑</a>
+  
+  <script>
+    // Show/hide back to top button
+    window.addEventListener('scroll', function() {
+      const backToTop = document.querySelector('.back-to-top');
+      if (window.pageYOffset > 300) {
+        backToTop.style.opacity = '1';
+        backToTop.style.pointerEvents = 'all';
+      } else {
+        backToTop.style.opacity = '0';
+        backToTop.style.pointerEvents = 'none';
+      }
+    });
+  </script>
 </body>
 </html>`;
+  }
+
+  private generateTableOfContents(html: string): string {
+    // Extract h2 headings for TOC
+    const h2Regex = /<h2[^>]*id=["']([^"']*)["'][^>]*>(.*?)<\/h2>/gi;
+    const matches = [...html.matchAll(h2Regex)];
+    
+    if (matches.length === 0) {
+      return ''; // No TOC if no h2 headings
+    }
+
+    const tocItems = matches.map(match => {
+      const id = match[1];
+      const title = match[2].replace(/<[^>]*>/g, ''); // Strip HTML tags
+      return `<li><a href="#${id}">${title}</a></li>`;
+    }).join('\n        ');
+
+    return `
+    <div class="toc-container">
+      <h2>📋 Table of Contents</h2>
+      <ul class="toc-list">
+        ${tocItems}
+      </ul>
+    </div>`;
   }
 
   async run() {

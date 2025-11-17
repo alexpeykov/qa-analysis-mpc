@@ -1,11 +1,11 @@
 {
-  "name": "QA-Core",
+  "name": "qa-analysis-mcp",
   "version": "0.1.0",
-  "description": "Helper for QA-Core team",
+  "description": "QA Analysis MCP Server - Integrates Jira, GitLab, TestRail, and MySQL for comprehensive QA workflow automation",
   "private": true,
   "type": "module",
   "bin": {
-    "QA-Core": "./build/index.js"
+    "qa-analysis-mcp": "./build/index.js"
   },
   "files": [
     "build"
