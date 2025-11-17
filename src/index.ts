@@ -1525,6 +1525,9 @@ class QAAnalysisServer {
     const titleMatch = html.match(/<h1[^>]*>(.*?)<\/h1>/i);
     const documentTitle = titleMatch ? titleMatch[1].replace(/<[^>]*>/g, '') : 'Test Analysis & Summary';
     
+    // Add IDs to h2 headings for TOC navigation
+    html = this.addIdsToHeadings(html);
+    
     // Generate table of contents from h2 headings
     const toc = this.generateTableOfContents(html);
 
@@ -1920,23 +1923,21 @@ html {
 </style>
 `;
 
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
+    return `<html lang="en"><head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${documentTitle}</title>
-  ${css}
+  
+${css}
+
 </head>
 <body>
   <div class="container">
     <div class="header">
       <h1>🧪 ${documentTitle}</h1>
-      <div class="meta">Test Analysis & Summary Report</div>
+      <div class="meta">Test Analysis &amp; Summary Report</div>
       <div class="meta">${currentDate}</div>
     </div>
-    
-    ${toc}
     
     <div class="content">
       ${html}
@@ -1946,7 +1947,6 @@ html {
   <a href="#" class="back-to-top" title="Back to top">↑</a>
   
   <script>
-    // Show/hide back to top button
     window.addEventListener('scroll', function() {
       const backToTop = document.querySelector('.back-to-top');
       if (window.pageYOffset > 300) {
@@ -1958,8 +1958,19 @@ html {
       }
     });
   </script>
-</body>
-</html>`;
+
+
+</body></html>`;
+  }
+
+  private addIdsToHeadings(html: string): string {
+    // Add IDs to h2 headings for TOC navigation
+    let counter = 0;
+    return html.replace(/<h2>(.*?)<\/h2>/gi, (match, content) => {
+      counter++;
+      const id = `section-${counter}`;
+      return `<h2 id="${id}">${content}</h2>`;
+    });
   }
 
   private generateTableOfContents(html: string): string {
@@ -1977,8 +1988,7 @@ html {
       return `<li><a href="#${id}">${title}</a></li>`;
     }).join('\n        ');
 
-    return `
-    <div class="toc-container">
+    return `<div class="toc-container">
       <h2>📋 Table of Contents</h2>
       <ul class="toc-list">
         ${tocItems}
