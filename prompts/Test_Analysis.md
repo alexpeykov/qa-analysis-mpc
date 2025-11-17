@@ -1,7 +1,7 @@
 Generate a comprehensive test analysis report for:
 
-JIRA Ticket: CORE-4991
-Merge Request: 11957
+JIRA Ticket: 
+Merge Request: 
 
 Follow these steps:
 
