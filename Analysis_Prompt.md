@@ -190,7 +190,7 @@ Merge Request IID: 11850
 ## Deliverables:
 
 1. ✅ **Short Summary** - Concise overview (displayed in chat)
-2. ✅ **Markdown File** - `[TICKET-KEY]_Test_Analysis.md` (in the qa-analysis mpc folder)
-3. ✅ **HTML File** - `/Users/employee/Documents/[TICKET-KEY]_Test_Analysis.html` (with template styling)
+2. ✅ **Markdown File** - `/Users/employee/Documents/Cline/MCP/qa-analysis-mcp/test_analysis/[TICKET-KEY]_Test_Analysis.md`
+3. ✅ **HTML File** - `/Users/employee/Documents/Cline/MCP/qa-analysis-mcp/test_analysis/[TICKET-KEY]_Test_Analysis.html` (with template styling)
 
 **All files should have consistent content and maintain the same level of detail and professionalism as the CORE-5534 example.**

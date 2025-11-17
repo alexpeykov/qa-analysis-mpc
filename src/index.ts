@@ -28,6 +28,9 @@ const GITLAB_TOKEN = process.env.GITLAB_TOKEN;
 const TESTRAIL_URL = process.env.TESTRAIL_URL;
 const TESTRAIL_EMAIL = process.env.TESTRAIL_EMAIL;
 const TESTRAIL_API_KEY = process.env.TESTRAIL_API_KEY;
+const CONFLUENCE_URL = process.env.CONFLUENCE_URL;
+const CONFLUENCE_EMAIL = process.env.CONFLUENCE_EMAIL;
+const CONFLUENCE_API_TOKEN = process.env.CONFLUENCE_API_TOKEN;
 
 // MySQL Environment variables - Gateway Database
 const MYSQL_HOST = process.env.MYSQL_HOST;
@@ -76,6 +79,7 @@ class QAAnalysisServer {
   private jiraClient?: AxiosInstance;
   private gitlabClient?: AxiosInstance;
   private testrailClient?: AxiosInstance;
+  private confluenceClient?: AxiosInstance;
 
   constructor() {
     this.server = new Server(
