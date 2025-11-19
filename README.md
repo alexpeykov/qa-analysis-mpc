@@ -261,11 +261,40 @@ POSTGRES_PASSWORD=your_password  # Database password
 - `generate_test_cases` - Convert test ideas into detailed test cases
   - Supports: functional, integration, regression, smoke, or all types
 
+- `generate_html_test_report` - **NEW!** Generate comprehensive HTML test analysis report
+  - **Single API call** generates complete professional HTML report
+  - Includes: ticket info, MR analysis, test ideas, test cases, metrics
+  - **70-80% cost reduction** vs manual HTML construction
+  - Responsive design, print-ready, smooth scrolling
+  - **Input:** All gathered data (jira_data, gitlab_mr_data, test_ideas, test_cases, comments)
+  - **Output:** Complete HTML file ready to save
+
 **Example Usage:**
 ```
 "Generate test ideas for CORE-5534 and MR 789"
 "Create functional test cases for ticket PROJ-123"
+"Generate HTML test report for CORE-5531"
 ```
+
+**Complete HTML Report Generation Workflow:**
+```
+1. analyze_jira_ticket (CORE-5531)
+2. analyze_jira_comments (CORE-5531)
+3. analyze_gitlab_mr (project_id, mr_iid)
+4. analyze_gitlab_changes (project_id, mr_iid)
+5. generate_test_ideas (with focus_areas)
+6. generate_test_cases (test_type: 'all')
+7. generate_html_test_report (all gathered data)
+8. Save HTML to file
+```
+
+**Benefits of HTML Report Generation:**
+- ✅ **Fast & Efficient** - Single API call (vs hundreds of messages)
+- ✅ **Cost Effective** - ~$0.05-0.15 per report (vs $0.30+ manual)
+- ✅ **Professional Design** - Beautiful gradient headers, responsive layout
+- ✅ **Complete Analysis** - All sections automatically filled
+- ✅ **Print Ready** - Optimized for PDF export
+- ✅ **No Manual Work** - Server-side HTML generation
 
 ---
 

@@ -1145,6 +1145,44 @@ class QAAnalysisServer {
             required: ["markdown"],
           },
         },
+        {
+          name: "generate_html_test_report",
+          description: "Generate a complete HTML test analysis report from Jira ticket, GitLab MR, test ideas, and test cases data. This tool generates the full HTML in one call.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              ticket_key: {
+                type: "string",
+                description: "Jira ticket key (e.g., CORE-5440)",
+              },
+              jira_data: {
+                type: "object",
+                description: "Jira ticket analysis data from analyze_jira_ticket",
+              },
+              jira_comments: {
+                type: "array",
+                description: "Jira comments data from analyze_jira_comments",
+              },
+              gitlab_mr_data: {
+                type: "object",
+                description: "GitLab MR data from analyze_gitlab_mr",
+              },
+              gitlab_changes_data: {
+                type: "object",
+                description: "GitLab changes data from analyze_gitlab_changes",
+              },
+              test_ideas: {
+                type: "object",
+                description: "Test ideas from generate_test_ideas",
+              },
+              test_cases: {
+                type: "array",
+                description: "Test cases from generate_test_cases",
+              },
+            },
+            required: ["ticket_key", "jira_data", "gitlab_mr_data", "test_ideas", "test_cases"],
+          },
+        },
         // Docker Container Operations
         {
           name: "list_docker_containers",
@@ -1475,6 +1513,8 @@ class QAAnalysisServer {
             return await this.getTableData(request.params.arguments);
           case "convert_markdown_to_html":
             return await this.convertMarkdownToHtml(request.params.arguments);
+          case "generate_html_test_report":
+            return await this.generateHtmlTestReport(request.params.arguments);
           // Docker handlers
           case "list_docker_containers":
             return await this.listDockerContainers(request.params.arguments);
@@ -3284,6 +3324,604 @@ ${css}
         ${tocItems}
       </ul>
     </div>`;
+  }
+
+  // HTML Test Report Generation
+
+  private async generateHtmlTestReport(args: any) {
+    try {
+      const ticketKey = String(args.ticket_key);
+      const jiraData = args.jira_data;
+      const jiraComments = args.jira_comments || [];
+      const gitlabMrData = args.gitlab_mr_data;
+      const gitlabChangesData = args.gitlab_changes_data || { files_changed: 0, changes: [] };
+      const testIdeas = args.test_ideas;
+      const testCases = args.test_cases || [];
+
+      const currentDate = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      // Extract priority level for badge
+      const priorityLevel = jiraData.priority?.toLowerCase() || 'medium';
+
+      // Build HTML
+      const html = this.buildTestReportHtml({
+        ticketKey,
+        jiraData,
+        jiraComments,
+        gitlabMrData,
+        gitlabChangesData,
+        testIdeas,
+        testCases,
+        currentDate,
+        priorityLevel,
+      });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: html,
+          },
+        ],
+      };
+    } catch (error: any) {
+      throw new McpError(
+        ErrorCode.InternalError,
+        `HTML report generation error: ${error.message}`
+      );
+    }
+  }
+
+  private buildTestReportHtml(data: any): string {
+    const {
+      ticketKey,
+      jiraData,
+      jiraComments,
+      gitlabMrData,
+      gitlabChangesData,
+      testIdeas,
+      testCases,
+      currentDate,
+      priorityLevel,
+    } = data;
+
+    // Count test ideas by category
+    const functionalCount = testIdeas.functional_tests?.length || 0;
+    const integrationCount = testIdeas.integration_tests?.length || 0;
+    const edgeCaseCount = testIdeas.edge_case_tests?.length || 0;
+    const regressionCount = testIdeas.regression_tests?.length || 0;
+    const securityCount = testIdeas.security_tests?.length || 0;
+    const performanceCount = testIdeas.performance_tests?.length || 0;
+    const totalIdeas = functionalCount + integrationCount + edgeCaseCount + regressionCount + securityCount + performanceCount;
+
+    // Build test ideas HTML
+    const testIdeasHtml = this.buildTestIdeasHtml(testIdeas);
+    
+    // Build test cases HTML
+    const testCasesHtml = this.buildTestCasesHtml(testCases);
+
+    // Build modified files HTML
+    const modifiedFilesHtml = this.buildModifiedFilesHtml(gitlabChangesData);
+
+    // Build comments HTML
+    const rootCauseHtml = this.buildRootCauseHtml(jiraComments);
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${ticketKey} Test Analysis Report</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #2c3e50;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .meta {
+            opacity: 0.9;
+            font-size: 1.1em;
+            margin: 5px 0;
+        }
+        
+        .meta a {
+            color: white;
+            text-decoration: underline;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .toc {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 8px;
+            margin-bottom: 40px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .toc h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+        
+        .toc ul {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .toc li {
+            margin: 10px 0;
+        }
+        
+        .toc a {
+            color: #5a67d8;
+            text-decoration: none;
+            font-size: 1.1em;
+            transition: all 0.2s;
+            display: block;
+            padding: 8px 12px;
+            border-radius: 4px;
+        }
+        
+        .toc a:hover {
+            background: #e9ecef;
+            transform: translateX(10px);
+        }
+        
+        section {
+            margin: 50px 0;
+            scroll-margin-top: 20px;
+        }
+        
+        h2 {
+            color: #667eea;
+            font-size: 2em;
+            margin: 40px 0 20px 0;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+        
+        h3 {
+            color: #764ba2;
+            font-size: 1.5em;
+            margin: 25px 0 15px 0;
+            border-left: 4px solid #667eea;
+            padding-left: 15px;
+        }
+        
+        p {
+            margin: 15px 0;
+            line-height: 1.8;
+        }
+        
+        a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        a:hover {
+            text-decoration: underline;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.9em;
+            font-weight: 600;
+            margin: 0 5px;
+        }
+        
+        .badge-priority-high { background: #ff6b6b; color: white; }
+        .badge-priority-medium { background: #ffd93d; color: #2c3e50; }
+        .badge-priority-low { background: #6bcf7f; color: white; }
+        .badge-status { background: #4ecdc4; color: white; }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .info-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .info-card strong {
+            color: #667eea;
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        ul, ol {
+            margin: 15px 0;
+            padding-left: 30px;
+        }
+        
+        li {
+            margin: 8px 0;
+            line-height: 1.7;
+        }
+        
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        pre {
+            background: #2d3436;
+            color: #dfe6e9;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.9em;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .back-to-top {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+            font-size: 24px;
+        }
+        
+        .back-to-top:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        
+        @media print {
+            body { background: white; padding: 0; }
+            .container { box-shadow: none; }
+            .back-to-top { display: none; }
+        }
+        
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .header { padding: 30px 20px; }
+            .header h1 { font-size: 1.8em; }
+            .content { padding: 20px; }
+            .toc { padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 ${ticketKey} Test Analysis Report</h1>
+            <div class="meta">
+                <a href="${jiraData.custom_fields?.customfield_10020 || `https://jira.paysera.net/browse/${ticketKey}`}" target="_blank">${ticketKey}</a> • 
+                <a href="${gitlabMrData.web_url}" target="_blank">MR !${gitlabMrData.web_url.split('/').pop()}</a>
+            </div>
+            <div class="meta">Generated: ${currentDate}</div>
+        </div>
+        
+        <div class="content">
+            <div class="toc">
+                <h2>📑 Table of Contents</h2>
+                <ul>
+                    <li><a href="#ticket-information">📋 Ticket Information</a></li>
+                    <li><a href="#issue-summary">🎯 Issue Summary</a></li>
+                    <li><a href="#root-cause">🔍 Root Cause Analysis</a></li>
+                    <li><a href="#solution-implemented">💡 Solution Implemented</a></li>
+                    <li><a href="#test-coverage">🧪 Test Coverage Analysis</a></li>
+                    <li><a href="#test-ideas">💭 Test Ideas</a></li>
+                    <li><a href="#test-cases">📝 Detailed Test Cases</a></li>
+                    <li><a href="#metrics">📊 Key Metrics</a></li>
+                </ul>
+            </div>
+            
+            <section id="ticket-information">
+                <h2>📋 Ticket Information</h2>
+                <div class="info-grid">
+                    <div class="info-card">
+                        <strong>Ticket</strong>
+                        <a href="https://jira.paysera.net/browse/${ticketKey}" target="_blank">${ticketKey}</a>
+                    </div>
+                    <div class="info-card">
+                        <strong>Merge Request</strong>
+                        <a href="${gitlabMrData.web_url}" target="_blank">!${gitlabMrData.web_url.split('/').pop()}</a>
+                    </div>
+                    <div class="info-card">
+                        <strong>Status</strong>
+                        <span class="badge badge-status">${jiraData.status || 'Unknown'}</span>
+                    </div>
+                    <div class="info-card">
+                        <strong>Priority</strong>
+                        <span class="badge badge-priority-${priorityLevel}">${jiraData.priority || 'Medium'}</span>
+                    </div>
+                    <div class="info-card">
+                        <strong>Assignee</strong>
+                        ${jiraData.assignee || 'Unassigned'}
+                    </div>
+                    <div class="info-card">
+                        <strong>Reporter</strong>
+                        ${jiraData.reporter || 'Unknown'}
+                    </div>
+                </div>
+            </section>
+            
+            <section id="issue-summary">
+                <h2>🎯 Issue Summary</h2>
+                <p><strong>${jiraData.summary}</strong></p>
+                <p>${this.extractFirstSentences(jiraData.description, 3)}</p>
+            </section>
+            
+            <section id="root-cause">
+                <h2>🔍 Root Cause Analysis</h2>
+                ${rootCauseHtml}
+            </section>
+            
+            <section id="solution-implemented">
+                <h2>💡 Solution Implemented</h2>
+                <h3>Files Modified</h3>
+                <p><strong>${gitlabChangesData.files_changed}</strong> files changed</p>
+                ${modifiedFilesHtml}
+                
+                <h3>Technical Changes</h3>
+                <p>View full changes in <a href="${gitlabMrData.web_url}" target="_blank">Merge Request !${gitlabMrData.web_url.split('/').pop()}</a></p>
+            </section>
+            
+            <section id="test-coverage">
+                <h2>🧪 Test Coverage Analysis</h2>
+                <div class="info-grid">
+                    <div class="info-card">
+                        <strong>Total Test Ideas</strong>
+                        ${totalIdeas} ideas
+                    </div>
+                    <div class="info-card">
+                        <strong>Functional Tests</strong>
+                        ${functionalCount}
+                    </div>
+                    <div class="info-card">
+                        <strong>Integration Tests</strong>
+                        ${integrationCount}
+                    </div>
+                    <div class="info-card">
+                        <strong>Edge Cases</strong>
+                        ${edgeCaseCount}
+                    </div>
+                    <div class="info-card">
+                        <strong>Regression Tests</strong>
+                        ${regressionCount}
+                    </div>
+                    <div class="info-card">
+                        <strong>Security Tests</strong>
+                        ${securityCount}
+                    </div>
+                </div>
+            </section>
+            
+            <section id="test-ideas">
+                <h2>💭 Test Ideas</h2>
+                ${testIdeasHtml}
+            </section>
+            
+            <section id="test-cases">
+                <h2>📝 Detailed Test Cases</h2>
+                ${testCasesHtml}
+            </section>
+            
+            <section id="metrics">
+                <h2>📊 Key Metrics</h2>
+                <div class="info-grid">
+                    <div class="info-card">
+                        <strong>MCP Tools Used</strong>
+                        6 tools
+                    </div>
+                    <div class="info-card">
+                        <strong>Files Analyzed</strong>
+                        ${gitlabChangesData.files_changed} files
+                    </div>
+                    <div class="info-card">
+                        <strong>Comments Reviewed</strong>
+                        ${jiraComments.length} comments
+                    </div>
+                    <div class="info-card">
+                        <strong>Test Cases Created</strong>
+                        ${testCases.length} cases
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+    
+    <a href="#" class="back-to-top" title="Back to top">↑</a>
+    
+    <script>
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+        
+        window.addEventListener('scroll', () => {
+            const backToTop = document.querySelector('.back-to-top');
+            if (window.pageYOffset > 300) {
+                backToTop.style.opacity = '1';
+            } else {
+                backToTop.style.opacity = '0';
+            }
+        });
+    </script>
+</body>
+</html>`;
+  }
+
+  private extractFirstSentences(text: string, count: number = 3): string {
+    if (!text) return 'No description provided';
+    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    return sentences.slice(0, count).join('. ') + '.';
+  }
+
+  private buildTestIdeasHtml(testIdeas: any): string {
+    const sections = [
+      { key: 'functional_tests', title: 'Functional Tests', icon: '⚙️' },
+      { key: 'integration_tests', title: 'Integration Tests', icon: '🔗' },
+      { key: 'edge_case_tests', title: 'Edge Cases', icon: '🎯' },
+      { key: 'regression_tests', title: 'Regression Tests', icon: '🔄' },
+      { key: 'security_tests', title: 'Security Tests', icon: '🔒' },
+      { key: 'performance_tests', title: 'Performance Tests', icon: '⚡' },
+    ];
+
+    let html = '';
+    for (const section of sections) {
+      const ideas = testIdeas[section.key] || [];
+      if (ideas.length > 0) {
+        html += `<h3>${section.icon} ${section.title}</h3><ul>`;
+        ideas.forEach((idea: string) => {
+          html += `<li>${idea}</li>`;
+        });
+        html += '</ul>';
+      }
+    }
+    return html || '<p>No test ideas generated</p>';
+  }
+
+  private buildTestCasesHtml(testCases: any[]): string {
+    if (!testCases || testCases.length === 0) {
+      return '<p>No test cases generated</p>';
+    }
+
+    let html = '';
+    testCases.forEach((tc: any, index: number) => {
+      html += `
+        <div class="info-card" style="margin-bottom: 20px;">
+          <h3>${tc.id}: ${tc.title}</h3>
+          <p><strong>Type:</strong> ${tc.type} | <strong>Priority:</strong> ${tc.priority}</p>
+          <ol>
+            ${tc.steps.map((step: any) => `
+              <li>
+                <strong>Action:</strong> ${step.action}<br>
+                <strong>Expected:</strong> ${step.expected}
+              </li>
+            `).join('')}
+          </ol>
+        </div>
+      `;
+    });
+
+    return html;
+  }
+
+  private buildModifiedFilesHtml(gitlabChangesData: any): string {
+    if (!gitlabChangesData.changes || gitlabChangesData.changes.length === 0) {
+      return '<p>No files modified</p>';
+    }
+
+    let html = '<ul>';
+    gitlabChangesData.changes.forEach((change: any) => {
+      const icon = change.new_file ? '🆕' : change.deleted_file ? '❌' : '📝';
+      html += `<li>${icon} <code>${change.new_path || change.old_path}</code></li>`;
+    });
+    html += '</ul>';
+    return html;
+  }
+
+  private buildRootCauseHtml(jiraComments: any[]): string {
+    if (!jiraComments || jiraComments.length === 0) {
+      return '<p>No additional comments available</p>';
+    }
+
+    let html = '';
+    jiraComments.forEach((comment: any) => {
+      html += `
+        <div class="info-card" style="margin-bottom: 15px;">
+          <p><strong>${comment.author}</strong> - ${new Date(comment.created).toLocaleDateString()}</p>
+          <p>${comment.body}</p>
+        </div>
+      `;
+    });
+
+    return html;
   }
 
   // Docker Methods
