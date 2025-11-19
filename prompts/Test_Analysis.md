@@ -1,13 +1,9 @@
-## ⬇️⬇️⬇️ START PROMPT HERE ⬇️⬇️⬇️
-
-```
 ═══════════════════════════════════════════════════════════
 ⬇️ YOUR INPUT GOES HERE ⬇️
 ═══════════════════════════════════════════════════════════
 
-JIRA Ticket: CORE-5534
-GitLab Project: paysera/app-evpbank
-GitLab MR Number: 11952
+JIRA Ticket: https://jira.paysera.net/browse/CORE-5440
+GitLab MR Number: https://gitlab.paysera.net/paysera/app-mokejimai/-/merge_requests/13045 https://gitlab.paysera.net/paysera/app-mokejimai/-/merge_requests/12998
 
 Optional (leave as "none" if not applicable):
 - Related Tickets: none
@@ -97,6 +93,5 @@ Present a detailed summary report including:
 ---
 
 **IMPORTANT:** Execute all steps automatically. Do NOT ask for approval between steps. Present all findings in a clear, organized summary.
-```
 
 ## ⬆️⬆️⬆️ END PROMPT HERE ⬆️⬆️⬆️

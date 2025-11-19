@@ -1,6 +1,6 @@
 # QA Analysis MCP Server
 
-A comprehensive Model Context Protocol (MCP) server for QA workflow automation, integrating Jira, GitLab, TestRail, and MySQL databases to streamline quality assurance processes.
+A comprehensive Model Context Protocol (MCP) server for QA workflow automation, integrating Jira, GitLab, TestRail, databases (MySQL & PostgreSQL), Docker, and browser automation to streamline quality assurance processes.
 
 ## Overview
 
@@ -9,7 +9,18 @@ This MCP server provides tools for:
 - **GitLab Analysis** - Review merge requests and code changes
 - **TestRail Integration** - Manage test cases, sections, suites, and test runs
 - **MySQL Database Access** - Query multiple databases through SSH tunnels
+- **PostgreSQL Support** - Infrastructure for PostgreSQL database queries
+- **Docker Management** - Full container, image, network, and volume management (15 tools)
+- **Markdown Conversion** - Convert Markdown to styled HTML
 - **Test Generation** - Automatically generate test ideas and test cases
+
+## Optional Companion Servers
+
+Enhance your QA workflow with these complementary MCP servers:
+- **Chrome DevTools MCP** - Browser automation and testing
+- **Context7** - Up-to-date library and framework documentation (100+ libraries)
+
+See the [Companion Servers](#companion-servers) section for setup instructions.
 
 ## Features
 
@@ -137,6 +148,105 @@ All database connections automatically route through an SSH tunnel for security:
 
 ---
 
+### 🐳 Docker Management (NEW)
+
+Complete Docker operations for managing containers, images, networks, and volumes in your test environments.
+
+#### Container Operations (6 tools)
+- `list_docker_containers` - List all Docker containers
+  - Optional `all` parameter to show stopped containers (default: true)
+  
+- `start_docker_container` - Start a stopped container
+  - Required: `container_id` - Container ID or name
+  
+- `stop_docker_container` - Stop a running container
+  - Required: `container_id` - Container ID or name
+  
+- `remove_docker_container` - Remove a container
+  - Required: `container_id` - Container ID or name
+  - Optional: `force` - Force removal of running container
+  
+- `get_docker_container_logs` - Get container logs
+  - Required: `container_id` - Container ID or name
+  - Optional: `tail` - Number of lines from end (default: 100)
+  
+- `inspect_docker_container` - Get detailed container information
+  - Required: `container_id` - Container ID or name
+
+#### Image Operations (3 tools)
+- `list_docker_images` - List all Docker images
+  
+- `pull_docker_image` - Pull an image from registry
+  - Required: `image_name` - Image name (e.g., nginx:latest)
+  
+- `remove_docker_image` - Remove a Docker image
+  - Required: `image_id` - Image ID or name
+  - Optional: `force` - Force removal
+
+#### Network Operations (3 tools)
+- `list_docker_networks` - List all Docker networks
+  
+- `create_docker_network` - Create a Docker network
+  - Required: `name` - Network name
+  - Optional: `driver` - Network driver (default: bridge)
+  
+- `remove_docker_network` - Remove a Docker network
+  - Required: `network_id` - Network ID or name
+
+#### Volume Operations (3 tools)
+- `list_docker_volumes` - List all Docker volumes
+  
+- `create_docker_volume` - Create a Docker volume
+  - Required: `name` - Volume name
+  - Optional: `driver` - Volume driver (default: local)
+  
+- `remove_docker_volume` - Remove a Docker volume
+  - Required: `name` - Volume name
+  - Optional: `force` - Force removal
+
+**Example Usage:**
+```
+"List all docker containers"
+"Start container my-test-db"
+"Get logs from container nginx-server tail 50"
+"Pull docker image postgres:15"
+"List all docker networks"
+"Create docker volume test-data"
+```
+
+---
+
+### 🐘 PostgreSQL Support (NEW)
+
+Infrastructure ready for PostgreSQL database operations.
+
+#### Current Status
+- ✅ PostgreSQL client library installed (`pg`)
+- ✅ Environment variables configured
+- ✅ Connection pool setup ready
+- ⏳ Query tools can be added following MySQL pattern
+
+#### Configuration
+Add these environment variables to enable PostgreSQL:
+
+```bash
+POSTGRES_HOST=localhost          # PostgreSQL server host
+POSTGRES_PORT=5432              # PostgreSQL server port (default: 5432)
+POSTGRES_DATABASE=your_db        # Database name
+POSTGRES_USER=your_user          # Database user
+POSTGRES_PASSWORD=your_password  # Database password
+```
+
+#### Future Capabilities (When Implemented)
+- Execute SELECT queries (read-only)
+- List tables and schemas
+- Describe table structures
+- Fetch table data with filtering
+
+**Note:** PostgreSQL query tools can be implemented following the same pattern as MySQL tools in `src/index.ts`.
+
+---
+
 ### 🤖 Test Generation
 
 #### Tools
@@ -211,6 +321,9 @@ This will install all required packages including:
 - `@modelcontextprotocol/sdk` - MCP server framework
 - `axios` - HTTP client for API calls
 - `mysql2` - MySQL database driver
+- `pg` - PostgreSQL database driver
+- `dockerode` - Docker API client
+- `marked` - Markdown parser
 - `tunnel-ssh` - SSH tunneling support
 
 #### 3️⃣ Obtain API Credentials
@@ -585,6 +698,179 @@ Add to MCP settings file:
 - `include_css`: `true` or `false` (default: false) - Include GitHub-style CSS
 - `sanitize`: `true` or `false` (default: true) - Sanitize HTML output
 
+### Docker Tools (NEW)
+| Tool | Required Parameters | Optional Parameters | Description |
+|------|-------------------|-------------------|-------------|
+| `list_docker_containers` | - | `all` | List all containers |
+| `start_docker_container` | `container_id` | - | Start a container |
+| `stop_docker_container` | `container_id` | - | Stop a container |
+| `remove_docker_container` | `container_id` | `force` | Remove a container |
+| `get_docker_container_logs` | `container_id` | `tail` | Get container logs |
+| `inspect_docker_container` | `container_id` | - | Inspect container details |
+| `list_docker_images` | - | - | List all images |
+| `pull_docker_image` | `image_name` | - | Pull an image |
+| `remove_docker_image` | `image_id` | `force` | Remove an image |
+| `list_docker_networks` | - | - | List all networks |
+| `create_docker_network` | `name` | `driver` | Create a network |
+| `remove_docker_network` | `network_id` | - | Remove a network |
+| `list_docker_volumes` | - | - | List all volumes |
+| `create_docker_volume` | `name` | `driver` | Create a volume |
+| `remove_docker_volume` | `name` | `force` | Remove a volume |
+
+---
+
+## Companion Servers
+
+These optional MCP servers run separately but complement qa-analysis-mcp for enhanced QA workflows.
+
+### 🌐 Chrome DevTools MCP Server
+
+**Purpose:** Browser automation and testing via Chrome DevTools Protocol
+
+**Installation:** Already included! Wrapper script created at:
+```bash
+/Users/employee/Documents/Cline/MCP/qa-analysis-mcp/bin/chrome-devtools-wrapper.sh
+```
+
+**Configuration:**
+```json
+{
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "/path/to/qa-analysis-mcp/bin/chrome-devtools-wrapper.sh",
+      "args": []
+    }
+  }
+}
+```
+
+**Features:**
+- ✅ Browser automation (navigate, click, type)
+- ✅ Screenshot capture
+- ✅ JavaScript execution in browser context
+- ✅ Network monitoring and interception
+- ✅ Performance profiling
+- ✅ Console log capture
+
+**Usage Examples:**
+```
+"Navigate to https://example.com and take a screenshot"
+"Click the login button on the current page"
+"Monitor network requests on this page"
+```
+
+**Requirements:**
+- Node.js 18+ and npm/npx
+- Chrome or Chromium browser
+
+**Documentation:** See `CHROME_DEVTOOLS_IMPLEMENTATION_SUMMARY.md` in the Notes directory
+
+---
+
+### 📚 Context7 Documentation Server
+
+**Purpose:** Fetch up-to-date library and framework documentation (100+ libraries)
+
+**Installation Options:**
+
+**Option 1: NPX-based (Simple)**
+```bash
+# Create wrapper script
+cat > /path/to/qa-analysis-mcp/bin/context7-wrapper.sh << 'EOF'
+#!/bin/bash
+exec npx -y @upstash/context7-mcp@latest
+EOF
+
+chmod +x /path/to/qa-analysis-mcp/bin/context7-wrapper.sh
+```
+
+**Option 2: Hosted Endpoint (Claude Code only)**
+```json
+{
+  "mcpServers": {
+    "context7": {
+      "url": "https://mcp.context7.com/mcp"
+    }
+  }
+}
+```
+
+**Option 3: Local Build**
+```bash
+cd ~/Documents/Cline/MCP
+git clone https://github.com/upstash/context7.git
+cd context7
+npm install
+npm run build
+```
+
+**Configuration:**
+```json
+{
+  "mcpServers": {
+    "context7": {
+      "command": "node",
+      "args": ["/path/to/context7/dist/index.js"]
+    }
+  }
+}
+```
+
+**Features:**
+- ✅ Up-to-date library documentation (not year-old training data)
+- ✅ Version-specific docs
+- ✅ No API keys required
+- ✅ 100+ supported libraries (React, Next.js, Vue, Express, PostgreSQL, etc.)
+- ✅ Topic filtering
+
+**Usage Examples:**
+```
+"Get React hooks documentation use context7"
+"Show me Next.js routing examples use context7"
+"Get PostgreSQL indexing docs use context7"
+```
+
+**Documentation:** See `CONTEXT7_INTEGRATION_GUIDE.md` in the Notes directory
+
+---
+
+### Complete MCP Setup Example
+
+**For maximum QA productivity, run all three servers together:**
+
+```json
+{
+  "mcpServers": {
+    "qa-analysis-mcp": {
+      "command": "node",
+      "args": ["/path/to/qa-analysis-mcp/build/index.js"],
+      "env": {
+        "JIRA_URL": "https://jira.company.com",
+        "GITLAB_URL": "https://gitlab.company.com",
+        "TESTRAIL_URL": "https://testrail.company.com",
+        "MYSQL_HOST": "db.company.com",
+        "POSTGRES_HOST": "postgres.company.com"
+      }
+    },
+    "chrome-devtools": {
+      "command": "/path/to/qa-analysis-mcp/bin/chrome-devtools-wrapper.sh",
+      "args": []
+    },
+    "context7": {
+      "command": "node",
+      "args": ["/path/to/context7/dist/index.js"]
+    }
+  }
+}
+```
+
+**This gives you:**
+- ✅ QA workflow automation (Jira, GitLab, TestRail)
+- ✅ Database queries (MySQL, PostgreSQL)
+- ✅ Docker management
+- ✅ Browser automation (Chrome DevTools)
+- ✅ Library documentation (Context7)
+
 ---
 
 ## Security
@@ -812,6 +1098,13 @@ Internal use only - Paysera QA Team
 
 For issues or questions, contact the QA-Core team.
 
-**Version:** 0.1.0  
-**Last Updated:** 2025-01-17  
+**Version:** 0.2.0  
+**Last Updated:** 2025-11-19  
 **Repository:** https://github.com/alexpeykov/qa-analysis-mpc
+
+**Latest Changes:**
+- ✅ Added Docker Management (15 tools for containers, images, networks, volumes)
+- ✅ Added PostgreSQL Support (infrastructure ready)
+- ✅ Added Chrome DevTools MCP Server integration (browser automation)
+- ✅ Added Context7 Documentation Server guide (100+ library docs)
+- ✅ Updated dependencies (dockerode, pg, marked)

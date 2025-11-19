@@ -1,7 +1,7 @@
 {
   "name": "qa-analysis-mcp",
   "version": "0.1.0",
-  "description": "QA Analysis MCP Server - Integrates Jira, GitLab, TestRail, and MySQL for comprehensive QA workflow automation",
+  "description": "QA Analysis MCP Server - Integrates Jira, GitLab, TestRail, MySQL, and PostgreSQL for comprehensive QA workflow automation",
   "private": true,
   "type": "module",
   "bin": {
@@ -19,13 +19,17 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "0.6.0",
     "axios": "^1.13.2",
+    "dockerode": "^4.0.0",
     "marked": "^17.0.0",
     "mysql2": "^3.15.3",
+    "pg": "^8.11.3",
     "ssh2": "^1.17.0",
     "tunnel-ssh": "^5.2.0"
   },
   "devDependencies": {
+    "@types/dockerode": "^3.3.0",
     "@types/node": "^20.11.24",
+    "@types/pg": "^8.10.0",
     "typescript": "^5.3.3"
   }
 }

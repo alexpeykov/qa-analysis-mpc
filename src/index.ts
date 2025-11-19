@@ -15,9 +15,13 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import axios, { AxiosInstance } from "axios";
 import mysql from "mysql2/promise";
+import pg from "pg";
 import { createTunnel } from "tunnel-ssh";
 import fs from "fs";
 import { marked } from "marked";
+import Docker from "dockerode";
+
+const { Pool } = pg;
 
 // Environment variables for credentials
 const JIRA_URL = process.env.JIRA_URL;
@@ -45,6 +49,13 @@ const EVP_LT_PORT = process.env.EVP_LT_PORT ? parseInt(process.env.EVP_LT_PORT) 
 const EVP_LT_DATABASE = process.env.EVP_LT_DATABASE;
 const EVP_LT_USER = process.env.EVP_LT_USER;
 const EVP_LT_PASSWORD = process.env.EVP_LT_PASSWORD;
+
+// PostgreSQL Environment variables
+const POSTGRES_HOST = process.env.POSTGRES_HOST;
+const POSTGRES_PORT = process.env.POSTGRES_PORT ? parseInt(process.env.POSTGRES_PORT) : 5432;
+const POSTGRES_DATABASE = process.env.POSTGRES_DATABASE;
+const POSTGRES_USER = process.env.POSTGRES_USER;
+const POSTGRES_PASSWORD = process.env.POSTGRES_PASSWORD;
 
 // SSH Tunnel Environment variables
 const SSH_HOST = process.env.SSH_HOST;
@@ -80,6 +91,7 @@ class QAAnalysisServer {
   private gitlabClient?: AxiosInstance;
   private testrailClient?: AxiosInstance;
   private confluenceClient?: AxiosInstance;
+  private dockerClient?: Docker;
 
   constructor() {
     this.server = new Server(
@@ -144,6 +156,14 @@ class QAAnalysisServer {
           'Content-Type': 'application/json',
         },
       });
+    }
+
+    // Initialize Docker client
+    try {
+      this.dockerClient = new Docker();
+    } catch (error) {
+      // Docker not available - this is optional
+      console.error("[Docker] Docker client not available:", error);
     }
   }
 
@@ -427,6 +447,599 @@ class QAAnalysisServer {
           },
         },
         {
+          name: "get_testrail_suite",
+          description: "Get details of a specific test suite by ID",
+          inputSchema: {
+            type: "object",
+            properties: {
+              suite_id: {
+                type: "number",
+                description: "TestRail Suite ID to retrieve",
+              },
+            },
+            required: ["suite_id"],
+          },
+        },
+        {
+          name: "add_testrail_suite",
+          description: "Create a new test suite in the specified project",
+          inputSchema: {
+            type: "object",
+            properties: {
+              project_id: {
+                type: "number",
+                description: "TestRail Project ID where the suite will be created",
+              },
+              name: {
+                type: "string",
+                description: "Name of the test suite",
+              },
+              description: {
+                type: "string",
+                description: "Description of the test suite (optional)",
+              },
+            },
+            required: ["project_id", "name"],
+          },
+        },
+        {
+          name: "update_testrail_suite",
+          description: "Update an existing test suite",
+          inputSchema: {
+            type: "object",
+            properties: {
+              suite_id: {
+                type: "number",
+                description: "TestRail Suite ID to update",
+              },
+              name: {
+                type: "string",
+                description: "New name for the test suite (optional)",
+              },
+              description: {
+                type: "string",
+                description: "New description for the test suite (optional)",
+              },
+            },
+            required: ["suite_id"],
+          },
+        },
+        // TestRail Cases - Extended
+        {
+          name: "get_testrail_case",
+          description: "Retrieves complete details for a single test case including steps, expected results, and prerequisites. REQUIRED: caseId.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              case_id: {
+                type: "number",
+                description: "TestRail Case ID",
+              },
+            },
+            required: ["case_id"],
+          },
+        },
+        {
+          name: "get_testrail_cases",
+          description: "Retrieves test cases list with basic fields only (excludes steps/expected results for performance). REQUIRED: projectId, suiteId. OPTIONAL: limit (default 50), offset (default 0). Use getCase for full details.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              project_id: {
+                type: "number",
+                description: "TestRail Project ID",
+              },
+              suite_id: {
+                type: "number",
+                description: "TestRail Suite ID",
+              },
+              limit: {
+                type: "number",
+                description: "Number of cases to return per page (default: 50)",
+              },
+              offset: {
+                type: "number",
+                description: "Offset for pagination (default: 0)",
+              },
+            },
+            required: ["project_id", "suite_id"],
+          },
+        },
+        {
+          name: "update_testrail_case",
+          description: "Updates an existing test case. REQUIRED: caseId. OPTIONAL: title, typeId, priorityId, templateId, customSteps, customExpected, customStepsSeparated, etc. Only specified fields will be updated.",
+          inputSchema: {
+            type: "object",
+            properties: {
+              case_id: {
+                type: "number",
+                description: "TestRail Case ID",
+              },
+              title: {
+                type: "string",
+                description: "Test case title",
+              },
+              type_id: {
+                type: "number",
+                description: "Test case type ID",
+              },
+              priority_id: {
+                type: "number",
+                description: "Test case priority ID",
+              },
+              template_id: {
+                type: "number",
+                description: "Template ID (use 2 for custom_steps_separated support)",
+              },
+              custom_steps: {
+                type: "string",
+                description: "Test case steps",
+              },
+              custom_expected: {
+                type: "string",
+                description: "Expected results",
+              },
+              custom_steps_separated: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    content: { type: "string" },
+                    expected: { type: "string" },
+                  },
+                },
+                description: "Separated test steps array (requires template_id=2)",
+              },
+            },
+            required: ["case_id"],
+          },
+        },
+        {
+          name: "delete_testrail_case",
+          description: "Deletes a test case from TestRail",
+          inputSchema: {
+            type: "object",
+            properties: {
+              case_id: {
+                type: "number",
+                description: "TestRail Case ID",
+              },
+            },
+            required: ["case_id"],
+          },
+        },
+        {
+          name: "get_testrail_case_types",
+          description: "Retrieves all available test case types in TestRail",
+          inputSchema: {
+            type: "object",
+            properties: {},
+            required: [],
+          },
+        },
+        {
+          name: "get_testrail_case_fields",
+          description: "Retrieves all available test case fields in TestRail",
+          inputSchema: {
+            type: "object",
+            properties: {},
+            required: [],
+          },
+        },
+        // TestRail Sections - Extended
+        {
+          name: "get_testrail_section",
+          description: "Retrieves details of a specific section by ID",
+          inputSchema: {
+            type: "object",
+            properties: {
+              section_id: {
+                type: "number",
+                description: "TestRail Section ID",
+              },
+            },
+            required: ["section_id"],
+          },
+        },
+        {
+          name: "update_testrail_section",
+          description: "Updates an existing section",
+          inputSchema: {
+            type: "object",
+            properties: {
+              section_id: {
+                type: "number",
+                description: "TestRail Section ID",
+              },
+              name: {
+                type: "string",
+                description: "Section name",
+              },
+              description: {
+                type: "string",
+                description: "Section description",
+              },
+            },
+            required: ["section_id"],
+          },
+        },
+        {
+          name: "delete_testrail_section",
+          description: "Deletes a section",
+          inputSchema: {
+            type: "object",
+            properties: {
+              section_id: {
+                type: "number",
+                description: "TestRail Section ID",
+              },
+            },
+            required: ["section_id"],
+          },
+        },
+        // TestRail Runs - Extended
+        {
+          name: "get_testrail_runs",
+          description: "Retrieves all test runs for a specified TestRail project",
+          inputSchema: {
+            type: "object",
+            properties: {
+              project_id: {
+                type: "number",
+                description: "TestRail Project ID",
+              },
+              limit: {
+                type: "number",
+                description: "The number of runs to return per page",
+              },
+              offset: {
+                type: "number",
+                description: "The offset to start returning runs",
+              },
+            },
+            required: ["project_id"],
+          },
+        },
+        {
+          name: "add_testrail_run",
+          description: "Creates a new test run in a TestRail project",
+          inputSchema: {
+            type: "object",
+            properties: {
+              project_id: {
+                type: "number",
+                description: "TestRail Project ID",
+              },
+              suite_id: {
+                type: "number",
+                description: "Suite ID (required for multi-suite projects)",
+              },
+              name: {
+                type: "string",
+                description: "Test run name",
+              },
+              description: {
+                type: "string",
+                description: "Test run description",
+              },
+              include_all: {
+                type: "boolean",
+                description: "Include all test cases from the suite",
+              },
+              case_ids: {
+                type: "array",
+                items: { type: "number" },
+                description: "Specific case IDs to include",
+              },
+            },
+            required: ["project_id", "name"],
+          },
+        },
+        {
+          name: "update_testrail_run",
+          description: "Updates an existing test run",
+          inputSchema: {
+            type: "object",
+            properties: {
+              run_id: {
+                type: "number",
+                description: "TestRail Run ID",
+              },
+              name: {
+                type: "string",
+                description: "Test run name",
+              },
+              description: {
+                type: "string",
+                description: "Test run description",
+              },
+            },
+            required: ["run_id"],
+          },
+        },
+        {
+          name: "close_testrail_run",
+          description: "Closes (completes) an existing test run",
+          inputSchema: {
+            type: "object",
+            properties: {
+              run_id: {
+                type: "number",
+                description: "TestRail Run ID to close",
+              },
+            },
+            required: ["run_id"],
+          },
+        },
+        {
+          name: "delete_testrail_run",
+          description: "Deletes a test run permanently",
+          inputSchema: {
+            type: "object",
+            properties: {
+              run_id: {
+                type: "number",
+                description: "TestRail Run ID to delete",
+              },
+            },
+            required: ["run_id"],
+          },
+        },
+        // TestRail Tests
+        {
+          name: "get_testrail_tests",
+          description: "Retrieves a list of tests for a test run",
+          inputSchema: {
+            type: "object",
+            properties: {
+              run_id: {
+                type: "number",
+                description: "TestRail Run ID",
+              },
+              limit: {
+                type: "number",
+                description: "Number of tests to return per page (default: 50)",
+              },
+              offset: {
+                type: "number",
+                description: "Offset for pagination (default: 0)",
+              },
+            },
+            required: ["run_id"],
+          },
+        },
+        {
+          name: "get_testrail_test",
+          description: "Retrieves complete details for a single test, including all fields such as status, type, and results",
+          inputSchema: {
+            type: "object",
+            properties: {
+              test_id: {
+                type: "number",
+                description: "TestRail Test ID",
+              },
+            },
+            required: ["test_id"],
+          },
+        },
+        // TestRail Results
+        {
+          name: "get_testrail_results",
+          description: "Retrieves test results for a specific test",
+          inputSchema: {
+            type: "object",
+            properties: {
+              test_id: {
+                type: "number",
+                description: "TestRail Test ID",
+              },
+              limit: {
+                type: "number",
+                description: "The number of results to return per page",
+              },
+            },
+            required: ["test_id"],
+          },
+        },
+        {
+          name: "get_testrail_results_for_case",
+          description: "Retrieves test results for a specific test case in a test run",
+          inputSchema: {
+            type: "object",
+            properties: {
+              run_id: {
+                type: "number",
+                description: "TestRail Run ID",
+              },
+              case_id: {
+                type: "number",
+                description: "TestRail Case ID",
+              },
+              limit: {
+                type: "number",
+                description: "The number of results to return per page",
+              },
+            },
+            required: ["run_id", "case_id"],
+          },
+        },
+        {
+          name: "add_testrail_result_for_case",
+          description: "Adds a test result for a specific test case in a test run",
+          inputSchema: {
+            type: "object",
+            properties: {
+              run_id: {
+                type: "number",
+                description: "TestRail Run ID",
+              },
+              case_id: {
+                type: "number",
+                description: "TestRail Case ID",
+              },
+              status_id: {
+                type: "number",
+                description: "Status ID (1:Pass, 2:Blocked, 3:Untested, 4:Retest, 5:Fail)",
+              },
+              comment: {
+                type: "string",
+                description: "Comment for the test result",
+              },
+              elapsed: {
+                type: "string",
+                description: "Time spent testing (e.g., '30s', '2m 30s')",
+              },
+            },
+            required: ["run_id", "case_id"],
+          },
+        },
+        {
+          name: "add_testrail_results_for_cases",
+          description: "Adds test results for multiple test cases in a test run",
+          inputSchema: {
+            type: "object",
+            properties: {
+              run_id: {
+                type: "number",
+                description: "TestRail Run ID",
+              },
+              results: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    case_id: { type: "number" },
+                    status_id: { type: "number" },
+                    comment: { type: "string" },
+                  },
+                },
+                description: "Array of test case results to add",
+              },
+            },
+            required: ["run_id", "results"],
+          },
+        },
+        // TestRail Plans
+        {
+          name: "get_testrail_plans",
+          description: "Retrieves all test plans for a specified TestRail project",
+          inputSchema: {
+            type: "object",
+            properties: {
+              project_id: {
+                type: "number",
+                description: "TestRail Project ID",
+              },
+              limit: {
+                type: "number",
+                description: "The number of plans to return per page",
+              },
+            },
+            required: ["project_id"],
+          },
+        },
+        {
+          name: "get_testrail_plan",
+          description: "Retrieves details of a specific test plan by ID",
+          inputSchema: {
+            type: "object",
+            properties: {
+              plan_id: {
+                type: "number",
+                description: "TestRail Plan ID",
+              },
+            },
+            required: ["plan_id"],
+          },
+        },
+        {
+          name: "add_testrail_plan",
+          description: "Creates a new test plan in a TestRail project",
+          inputSchema: {
+            type: "object",
+            properties: {
+              project_id: {
+                type: "number",
+                description: "TestRail Project ID",
+              },
+              name: {
+                type: "string",
+                description: "Test plan name",
+              },
+              description: {
+                type: "string",
+                description: "Test plan description",
+              },
+            },
+            required: ["project_id", "name"],
+          },
+        },
+        {
+          name: "update_testrail_plan",
+          description: "Updates an existing test plan",
+          inputSchema: {
+            type: "object",
+            properties: {
+              plan_id: {
+                type: "number",
+                description: "TestRail Plan ID",
+              },
+              name: {
+                type: "string",
+                description: "Test plan name",
+              },
+              description: {
+                type: "string",
+                description: "Test plan description",
+              },
+            },
+            required: ["plan_id"],
+          },
+        },
+        {
+          name: "close_testrail_plan",
+          description: "Closes (completes) an existing test plan",
+          inputSchema: {
+            type: "object",
+            properties: {
+              plan_id: {
+                type: "number",
+                description: "TestRail Plan ID to close",
+              },
+            },
+            required: ["plan_id"],
+          },
+        },
+        {
+          name: "delete_testrail_plan",
+          description: "Deletes a test plan permanently",
+          inputSchema: {
+            type: "object",
+            properties: {
+              plan_id: {
+                type: "number",
+                description: "TestRail Plan ID to delete",
+              },
+            },
+            required: ["plan_id"],
+          },
+        },
+        // TestRail Milestones
+        {
+          name: "get_testrail_milestones",
+          description: "Retrieves all milestones for a specified TestRail project",
+          inputSchema: {
+            type: "object",
+            properties: {
+              project_id: {
+                type: "number",
+                description: "TestRail Project ID",
+              },
+            },
+            required: ["project_id"],
+          },
+        },
+        {
           name: "query_database",
           description: "Execute a SQL query on the configured MySQL database (READ-ONLY: SELECT queries only)",
           inputSchema: {
@@ -532,6 +1145,229 @@ class QAAnalysisServer {
             required: ["markdown"],
           },
         },
+        // Docker Container Operations
+        {
+          name: "list_docker_containers",
+          description: "List all Docker containers (running and stopped)",
+          inputSchema: {
+            type: "object",
+            properties: {
+              all: {
+                type: "boolean",
+                description: "Show all containers (default shows just running)",
+              },
+            },
+            required: [],
+          },
+        },
+        {
+          name: "start_docker_container",
+          description: "Start a Docker container",
+          inputSchema: {
+            type: "object",
+            properties: {
+              container_id: {
+                type: "string",
+                description: "Container ID or name",
+              },
+            },
+            required: ["container_id"],
+          },
+        },
+        {
+          name: "stop_docker_container",
+          description: "Stop a Docker container",
+          inputSchema: {
+            type: "object",
+            properties: {
+              container_id: {
+                type: "string",
+                description: "Container ID or name",
+              },
+            },
+            required: ["container_id"],
+          },
+        },
+        {
+          name: "remove_docker_container",
+          description: "Remove a Docker container",
+          inputSchema: {
+            type: "object",
+            properties: {
+              container_id: {
+                type: "string",
+                description: "Container ID or name",
+              },
+              force: {
+                type: "boolean",
+                description: "Force removal of running container",
+              },
+            },
+            required: ["container_id"],
+          },
+        },
+        {
+          name: "get_docker_container_logs",
+          description: "Get logs from a Docker container",
+          inputSchema: {
+            type: "object",
+            properties: {
+              container_id: {
+                type: "string",
+                description: "Container ID or name",
+              },
+              tail: {
+                type: "number",
+                description: "Number of lines from the end of logs (default: 100)",
+              },
+            },
+            required: ["container_id"],
+          },
+        },
+        {
+          name: "inspect_docker_container",
+          description: "Get detailed information about a Docker container",
+          inputSchema: {
+            type: "object",
+            properties: {
+              container_id: {
+                type: "string",
+                description: "Container ID or name",
+              },
+            },
+            required: ["container_id"],
+          },
+        },
+        // Docker Image Operations
+        {
+          name: "list_docker_images",
+          description: "List all Docker images",
+          inputSchema: {
+            type: "object",
+            properties: {},
+            required: [],
+          },
+        },
+        {
+          name: "pull_docker_image",
+          description: "Pull a Docker image from registry",
+          inputSchema: {
+            type: "object",
+            properties: {
+              image_name: {
+                type: "string",
+                description: "Image name (e.g., nginx:latest)",
+              },
+            },
+            required: ["image_name"],
+          },
+        },
+        {
+          name: "remove_docker_image",
+          description: "Remove a Docker image",
+          inputSchema: {
+            type: "object",
+            properties: {
+              image_id: {
+                type: "string",
+                description: "Image ID or name",
+              },
+              force: {
+                type: "boolean",
+                description: "Force removal",
+              },
+            },
+            required: ["image_id"],
+          },
+        },
+        // Docker Network Operations
+        {
+          name: "list_docker_networks",
+          description: "List all Docker networks",
+          inputSchema: {
+            type: "object",
+            properties: {},
+            required: [],
+          },
+        },
+        {
+          name: "create_docker_network",
+          description: "Create a Docker network",
+          inputSchema: {
+            type: "object",
+            properties: {
+              name: {
+                type: "string",
+                description: "Network name",
+              },
+              driver: {
+                type: "string",
+                description: "Network driver (default: bridge)",
+              },
+            },
+            required: ["name"],
+          },
+        },
+        {
+          name: "remove_docker_network",
+          description: "Remove a Docker network",
+          inputSchema: {
+            type: "object",
+            properties: {
+              network_id: {
+                type: "string",
+                description: "Network ID or name",
+              },
+            },
+            required: ["network_id"],
+          },
+        },
+        // Docker Volume Operations
+        {
+          name: "list_docker_volumes",
+          description: "List all Docker volumes",
+          inputSchema: {
+            type: "object",
+            properties: {},
+            required: [],
+          },
+        },
+        {
+          name: "create_docker_volume",
+          description: "Create a Docker volume",
+          inputSchema: {
+            type: "object",
+            properties: {
+              name: {
+                type: "string",
+                description: "Volume name",
+              },
+              driver: {
+                type: "string",
+                description: "Volume driver (default: local)",
+              },
+            },
+            required: ["name"],
+          },
+        },
+        {
+          name: "remove_docker_volume",
+          description: "Remove a Docker volume",
+          inputSchema: {
+            type: "object",
+            properties: {
+              name: {
+                type: "string",
+                description: "Volume name",
+              },
+              force: {
+                type: "boolean",
+                description: "Force removal",
+              },
+            },
+            required: ["name"],
+          },
+        },
       ],
     }));
 
@@ -568,6 +1404,67 @@ class QAAnalysisServer {
             return await this.getTestRailTestResults(request.params.arguments);
           case "get_testrail_suites":
             return await this.getTestRailSuites(request.params.arguments);
+          case "get_testrail_suite":
+            return await this.getTestRailSuite(request.params.arguments);
+          case "add_testrail_suite":
+            return await this.addTestRailSuite(request.params.arguments);
+          case "update_testrail_suite":
+            return await this.updateTestRailSuite(request.params.arguments);
+          // Extended TestRail handlers
+          case "get_testrail_case":
+            return await this.getTestRailCase(request.params.arguments);
+          case "get_testrail_cases":
+            return await this.getTestRailCases(request.params.arguments);
+          case "update_testrail_case":
+            return await this.updateTestRailCase(request.params.arguments);
+          case "delete_testrail_case":
+            return await this.deleteTestRailCase(request.params.arguments);
+          case "get_testrail_case_types":
+            return await this.getTestRailCaseTypes(request.params.arguments);
+          case "get_testrail_case_fields":
+            return await this.getTestRailCaseFields(request.params.arguments);
+          case "get_testrail_section":
+            return await this.getTestRailSection(request.params.arguments);
+          case "update_testrail_section":
+            return await this.updateTestRailSection(request.params.arguments);
+          case "delete_testrail_section":
+            return await this.deleteTestRailSection(request.params.arguments);
+          case "get_testrail_runs":
+            return await this.getTestRailRuns(request.params.arguments);
+          case "add_testrail_run":
+            return await this.addTestRailRun(request.params.arguments);
+          case "update_testrail_run":
+            return await this.updateTestRailRun(request.params.arguments);
+          case "close_testrail_run":
+            return await this.closeTestRailRun(request.params.arguments);
+          case "delete_testrail_run":
+            return await this.deleteTestRailRun(request.params.arguments);
+          case "get_testrail_tests":
+            return await this.getTestRailTests(request.params.arguments);
+          case "get_testrail_test":
+            return await this.getTestRailTest(request.params.arguments);
+          case "get_testrail_results":
+            return await this.getTestRailResults(request.params.arguments);
+          case "get_testrail_results_for_case":
+            return await this.getTestRailResultsForCase(request.params.arguments);
+          case "add_testrail_result_for_case":
+            return await this.addTestRailResultForCase(request.params.arguments);
+          case "add_testrail_results_for_cases":
+            return await this.addTestRailResultsForCases(request.params.arguments);
+          case "get_testrail_plans":
+            return await this.getTestRailPlans(request.params.arguments);
+          case "get_testrail_plan":
+            return await this.getTestRailPlan(request.params.arguments);
+          case "add_testrail_plan":
+            return await this.addTestRailPlan(request.params.arguments);
+          case "update_testrail_plan":
+            return await this.updateTestRailPlan(request.params.arguments);
+          case "close_testrail_plan":
+            return await this.closeTestRailPlan(request.params.arguments);
+          case "delete_testrail_plan":
+            return await this.deleteTestRailPlan(request.params.arguments);
+          case "get_testrail_milestones":
+            return await this.getTestRailMilestones(request.params.arguments);
           case "query_database":
             return await this.queryDatabase(request.params.arguments);
           case "list_tables":
@@ -578,6 +1475,37 @@ class QAAnalysisServer {
             return await this.getTableData(request.params.arguments);
           case "convert_markdown_to_html":
             return await this.convertMarkdownToHtml(request.params.arguments);
+          // Docker handlers
+          case "list_docker_containers":
+            return await this.listDockerContainers(request.params.arguments);
+          case "start_docker_container":
+            return await this.startDockerContainer(request.params.arguments);
+          case "stop_docker_container":
+            return await this.stopDockerContainer(request.params.arguments);
+          case "remove_docker_container":
+            return await this.removeDockerContainer(request.params.arguments);
+          case "get_docker_container_logs":
+            return await this.getDockerContainerLogs(request.params.arguments);
+          case "inspect_docker_container":
+            return await this.inspectDockerContainer(request.params.arguments);
+          case "list_docker_images":
+            return await this.listDockerImages(request.params.arguments);
+          case "pull_docker_image":
+            return await this.pullDockerImage(request.params.arguments);
+          case "remove_docker_image":
+            return await this.removeDockerImage(request.params.arguments);
+          case "list_docker_networks":
+            return await this.listDockerNetworks(request.params.arguments);
+          case "create_docker_network":
+            return await this.createDockerNetwork(request.params.arguments);
+          case "remove_docker_network":
+            return await this.removeDockerNetwork(request.params.arguments);
+          case "list_docker_volumes":
+            return await this.listDockerVolumes(request.params.arguments);
+          case "create_docker_volume":
+            return await this.createDockerVolume(request.params.arguments);
+          case "remove_docker_volume":
+            return await this.removeDockerVolume(request.params.arguments);
           default:
             throw new McpError(
               ErrorCode.MethodNotFound,
@@ -1011,6 +1939,368 @@ class QAAnalysisServer {
         },
       ],
     };
+  }
+
+  private async getTestRailSuite(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+
+    const suiteId = Number(args.suite_id);
+    const response = await this.testrailClient.get(`/get_suite/${suiteId}`);
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(response.data, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async addTestRailSuite(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+
+    const projectId = Number(args.project_id);
+    const payload: any = {
+      name: String(args.name),
+    };
+
+    if (args.description) {
+      payload.description = String(args.description);
+    }
+
+    const response = await this.testrailClient.post(`/add_suite/${projectId}`, payload);
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(response.data, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async updateTestRailSuite(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+
+    const suiteId = Number(args.suite_id);
+    const payload: any = {};
+
+    if (args.name) {
+      payload.name = String(args.name);
+    }
+
+    if (args.description) {
+      payload.description = String(args.description);
+    }
+
+    const response = await this.testrailClient.post(`/update_suite/${suiteId}`, payload);
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(response.data, null, 2),
+        },
+      ],
+    };
+  }
+
+  // Extended TestRail Methods
+
+  private async getTestRailCase(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const caseId = Number(args.case_id);
+    const response = await this.testrailClient.get(`/get_case/${caseId}`);
+    return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
+  }
+
+  private async getTestRailCases(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const projectId = Number(args.project_id);
+    const suiteId = Number(args.suite_id);
+    const limit = Number(args.limit || 50);
+    const offset = Number(args.offset || 0);
+    const response = await this.testrailClient.get(`/get_cases/${projectId}&suite_id=${suiteId}&limit=${limit}&offset=${offset}`);
+    return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
+  }
+
+  private async updateTestRailCase(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const caseId = Number(args.case_id);
+    const payload: any = {};
+    if (args.title) payload.title = String(args.title);
+    if (args.type_id) payload.type_id = Number(args.type_id);
+    if (args.priority_id) payload.priority_id = Number(args.priority_id);
+    if (args.template_id) payload.template_id = Number(args.template_id);
+    if (args.custom_steps) payload.custom_steps = String(args.custom_steps);
+    if (args.custom_expected) payload.custom_expected = String(args.custom_expected);
+    if (args.custom_steps_separated) payload.custom_steps_separated = args.custom_steps_separated;
+    const response = await this.testrailClient.post(`/update_case/${caseId}`, payload);
+    return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
+  }
+
+  private async deleteTestRailCase(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const caseId = Number(args.case_id);
+    await this.testrailClient.post(`/delete_case/${caseId}`);
+    return { content: [{ type: "text", text: `Case ${caseId} deleted successfully` }] };
+  }
+
+  private async getTestRailCaseTypes(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const response = await this.testrailClient.get('/get_case_types');
+    return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
+  }
+
+  private async getTestRailCaseFields(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const response = await this.testrailClient.get('/get_case_fields');
+    return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
+  }
+
+  private async getTestRailSection(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const sectionId = Number(args.section_id);
+    const response = await this.testrailClient.get(`/get_section/${sectionId}`);
+    return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
+  }
+
+  private async updateTestRailSection(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const sectionId = Number(args.section_id);
+    const payload: any = {};
+    if (args.name) payload.name = String(args.name);
+    if (args.description) payload.description = String(args.description);
+    const response = await this.testrailClient.post(`/update_section/${sectionId}`, payload);
+    return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
+  }
+
+  private async deleteTestRailSection(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const sectionId = Number(args.section_id);
+    await this.testrailClient.post(`/delete_section/${sectionId}`);
+    return { content: [{ type: "text", text: `Section ${sectionId} deleted successfully` }] };
+  }
+
+  private async getTestRailRuns(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const projectId = Number(args.project_id);
+    let url = `/get_runs/${projectId}`;
+    const params = [];
+    if (args.limit) params.push(`limit=${Number(args.limit)}`);
+    if (args.offset) params.push(`offset=${Number(args.offset)}`);
+    if (params.length > 0) url += `&${params.join('&')}`;
+    const response = await this.testrailClient.get(url);
+    return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
+  }
+
+  private async addTestRailRun(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const projectId = Number(args.project_id);
+    const payload: any = { name: String(args.name) };
+    if (args.suite_id) payload.suite_id = Number(args.suite_id);
+    if (args.description) payload.description = String(args.description);
+    if (args.include_all !== undefined) payload.include_all = Boolean(args.include_all);
+    if (args.case_ids) payload.case_ids = args.case_ids;
+    const response = await this.testrailClient.post(`/add_run/${projectId}`, payload);
+    return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
+  }
+
+  private async updateTestRailRun(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const runId = Number(args.run_id);
+    const payload: any = {};
+    if (args.name) payload.name = String(args.name);
+    if (args.description) payload.description = String(args.description);
+    const response = await this.testrailClient.post(`/update_run/${runId}`, payload);
+    return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
+  }
+
+  private async closeTestRailRun(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const runId = Number(args.run_id);
+    const response = await this.testrailClient.post(`/close_run/${runId}`);
+    return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
+  }
+
+  private async deleteTestRailRun(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const runId = Number(args.run_id);
+    await this.testrailClient.post(`/delete_run/${runId}`);
+    return { content: [{ type: "text", text: `Run ${runId} deleted successfully` }] };
+  }
+
+  private async getTestRailTests(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const runId = Number(args.run_id);
+    const limit = Number(args.limit || 50);
+    const offset = Number(args.offset || 0);
+    const response = await this.testrailClient.get(`/get_tests/${runId}&limit=${limit}&offset=${offset}`);
+    return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
+  }
+
+  private async getTestRailTest(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const testId = Number(args.test_id);
+    const response = await this.testrailClient.get(`/get_test/${testId}`);
+    return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
+  }
+
+  private async getTestRailResults(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const testId = Number(args.test_id);
+    let url = `/get_results/${testId}`;
+    if (args.limit) url += `&limit=${Number(args.limit)}`;
+    const response = await this.testrailClient.get(url);
+    return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
+  }
+
+  private async getTestRailResultsForCase(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const runId = Number(args.run_id);
+    const caseId = Number(args.case_id);
+    let url = `/get_results_for_case/${runId}/${caseId}`;
+    if (args.limit) url += `&limit=${Number(args.limit)}`;
+    const response = await this.testrailClient.get(url);
+    return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
+  }
+
+  private async addTestRailResultForCase(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const runId = Number(args.run_id);
+    const caseId = Number(args.case_id);
+    const payload: any = {};
+    if (args.status_id) payload.status_id = Number(args.status_id);
+    if (args.comment) payload.comment = String(args.comment);
+    if (args.elapsed) payload.elapsed = String(args.elapsed);
+    const response = await this.testrailClient.post(`/add_result_for_case/${runId}/${caseId}`, payload);
+    return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
+  }
+
+  private async addTestRailResultsForCases(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const runId = Number(args.run_id);
+    const payload = { results: args.results };
+    const response = await this.testrailClient.post(`/add_results_for_cases/${runId}`, payload);
+    return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
+  }
+
+  private async getTestRailPlans(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const projectId = Number(args.project_id);
+    let url = `/get_plans/${projectId}`;
+    if (args.limit) url += `&limit=${Number(args.limit)}`;
+    const response = await this.testrailClient.get(url);
+    return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
+  }
+
+  private async getTestRailPlan(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const planId = Number(args.plan_id);
+    const response = await this.testrailClient.get(`/get_plan/${planId}`);
+    return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
+  }
+
+  private async addTestRailPlan(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const projectId = Number(args.project_id);
+    const payload: any = { name: String(args.name) };
+    if (args.description) payload.description = String(args.description);
+    const response = await this.testrailClient.post(`/add_plan/${projectId}`, payload);
+    return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
+  }
+
+  private async updateTestRailPlan(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const planId = Number(args.plan_id);
+    const payload: any = {};
+    if (args.name) payload.name = String(args.name);
+    if (args.description) payload.description = String(args.description);
+    const response = await this.testrailClient.post(`/update_plan/${planId}`, payload);
+    return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
+  }
+
+  private async closeTestRailPlan(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const planId = Number(args.plan_id);
+    const response = await this.testrailClient.post(`/close_plan/${planId}`);
+    return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
+  }
+
+  private async deleteTestRailPlan(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const planId = Number(args.plan_id);
+    await this.testrailClient.post(`/delete_plan/${planId}`);
+    return { content: [{ type: "text", text: `Plan ${planId} deleted successfully` }] };
+  }
+
+  private async getTestRailMilestones(args: any) {
+    if (!this.testrailClient) {
+      throw new McpError(ErrorCode.InternalError, "TestRail client not initialized.");
+    }
+    const projectId = Number(args.project_id);
+    const response = await this.testrailClient.get(`/get_milestones/${projectId}`);
+    return { content: [{ type: "text", text: JSON.stringify(response.data, null, 2) }] };
   }
 
   // Helper methods for extraction and analysis
@@ -1994,6 +3284,311 @@ ${css}
         ${tocItems}
       </ul>
     </div>`;
+  }
+
+  // Docker Methods
+
+  private async listDockerContainers(args: any) {
+    if (!this.dockerClient) {
+      throw new McpError(ErrorCode.InternalError, "Docker client not initialized.");
+    }
+
+    const all = Boolean(args.all ?? true);
+    const containers = await this.dockerClient.listContainers({ all });
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(containers, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async startDockerContainer(args: any) {
+    if (!this.dockerClient) {
+      throw new McpError(ErrorCode.InternalError, "Docker client not initialized.");
+    }
+
+    const containerId = String(args.container_id);
+    const container = this.dockerClient.getContainer(containerId);
+    await container.start();
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Container ${containerId} started successfully`,
+        },
+      ],
+    };
+  }
+
+  private async stopDockerContainer(args: any) {
+    if (!this.dockerClient) {
+      throw new McpError(ErrorCode.InternalError, "Docker client not initialized.");
+    }
+
+    const containerId = String(args.container_id);
+    const container = this.dockerClient.getContainer(containerId);
+    await container.stop();
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Container ${containerId} stopped successfully`,
+        },
+      ],
+    };
+  }
+
+  private async removeDockerContainer(args: any) {
+    if (!this.dockerClient) {
+      throw new McpError(ErrorCode.InternalError, "Docker client not initialized.");
+    }
+
+    const containerId = String(args.container_id);
+    const force = Boolean(args.force ?? false);
+    const container = this.dockerClient.getContainer(containerId);
+    await container.remove({ force });
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Container ${containerId} removed successfully`,
+        },
+      ],
+    };
+  }
+
+  private async getDockerContainerLogs(args: any) {
+    if (!this.dockerClient) {
+      throw new McpError(ErrorCode.InternalError, "Docker client not initialized.");
+    }
+
+    const containerId = String(args.container_id);
+    const tail = Number(args.tail ?? 100);
+    const container = this.dockerClient.getContainer(containerId);
+    
+    const logs = await container.logs({
+      stdout: true,
+      stderr: true,
+      tail,
+      follow: false,
+    });
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: logs.toString(),
+        },
+      ],
+    };
+  }
+
+  private async inspectDockerContainer(args: any) {
+    if (!this.dockerClient) {
+      throw new McpError(ErrorCode.InternalError, "Docker client not initialized.");
+    }
+
+    const containerId = String(args.container_id);
+    const container = this.dockerClient.getContainer(containerId);
+    const info = await container.inspect();
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(info, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async listDockerImages(args: any) {
+    if (!this.dockerClient) {
+      throw new McpError(ErrorCode.InternalError, "Docker client not initialized.");
+    }
+
+    const images = await this.dockerClient.listImages();
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(images, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async pullDockerImage(args: any) {
+    if (!this.dockerClient) {
+      throw new McpError(ErrorCode.InternalError, "Docker client not initialized.");
+    }
+
+    const imageName = String(args.image_name);
+    const stream = await this.dockerClient.pull(imageName);
+
+    // Wait for pull to complete
+    await new Promise<void>((resolve, reject) => {
+      this.dockerClient!.modem.followProgress(stream, (err: Error | null) => {
+        if (err) return reject(err);
+        resolve();
+      });
+    });
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Image ${imageName} pulled successfully`,
+        },
+      ],
+    };
+  }
+
+  private async removeDockerImage(args: any) {
+    if (!this.dockerClient) {
+      throw new McpError(ErrorCode.InternalError, "Docker client not initialized.");
+    }
+
+    const imageId = String(args.image_id);
+    const force = Boolean(args.force ?? false);
+    const image = this.dockerClient.getImage(imageId);
+    await image.remove({ force });
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Image ${imageId} removed successfully`,
+        },
+      ],
+    };
+  }
+
+  private async listDockerNetworks(args: any) {
+    if (!this.dockerClient) {
+      throw new McpError(ErrorCode.InternalError, "Docker client not initialized.");
+    }
+
+    const networks = await this.dockerClient.listNetworks();
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(networks, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async createDockerNetwork(args: any) {
+    if (!this.dockerClient) {
+      throw new McpError(ErrorCode.InternalError, "Docker client not initialized.");
+    }
+
+    const name = String(args.name);
+    const driver = String(args.driver ?? 'bridge');
+    
+    const network = await this.dockerClient.createNetwork({
+      Name: name,
+      Driver: driver,
+    });
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ id: network.id, name }, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async removeDockerNetwork(args: any) {
+    if (!this.dockerClient) {
+      throw new McpError(ErrorCode.InternalError, "Docker client not initialized.");
+    }
+
+    const networkId = String(args.network_id);
+    const network = this.dockerClient.getNetwork(networkId);
+    await network.remove();
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Network ${networkId} removed successfully`,
+        },
+      ],
+    };
+  }
+
+  private async listDockerVolumes(args: any) {
+    if (!this.dockerClient) {
+      throw new McpError(ErrorCode.InternalError, "Docker client not initialized.");
+    }
+
+    const volumes = await this.dockerClient.listVolumes();
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(volumes.Volumes || [], null, 2),
+        },
+      ],
+    };
+  }
+
+  private async createDockerVolume(args: any) {
+    if (!this.dockerClient) {
+      throw new McpError(ErrorCode.InternalError, "Docker client not initialized.");
+    }
+
+    const name = String(args.name);
+    const driver = String(args.driver ?? 'local');
+    
+    const volume = await this.dockerClient.createVolume({
+      Name: name,
+      Driver: driver,
+    });
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ name: volume.Name }, null, 2),
+        },
+      ],
+    };
+  }
+
+  private async removeDockerVolume(args: any) {
+    if (!this.dockerClient) {
+      throw new McpError(ErrorCode.InternalError, "Docker client not initialized.");
+    }
+
+    const name = String(args.name);
+    const force = Boolean(args.force ?? false);
+    const volume = this.dockerClient.getVolume(name);
+    await volume.remove({ force });
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Volume ${name} removed successfully`,
+        },
+      ],
+    };
   }
 
   async run() {
