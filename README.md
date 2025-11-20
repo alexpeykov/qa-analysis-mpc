@@ -329,15 +329,15 @@ npm --version
 #### 1️⃣ Clone or Download the Repository
 
 ```bash
-# Navigate to your projects directory
+# Navigate to your MCP directory
 cd ~/Documents/Cline/MCP
 
 # If cloning from repository
-git clone <repository-url> qa-analysis-server
-cd qa-analysis-server
+git clone <repository-url> qa-analysis-mcp
+cd qa-analysis-mcp
 
 # Or if you already have it
-cd qa-analysis-server
+cd qa-analysis-mcp
 ```
 
 #### 2️⃣ Install Dependencies
@@ -514,7 +514,7 @@ This runs TypeScript compiler in watch mode - any changes to `.ts` files will au
 **Complete Clean Setup:**
 ```bash
 #!/bin/bash
-cd ~/Documents/Cline/MCP/qa-analysis-server
+cd ~/Documents/Cline/MCP/qa-analysis-mcp
 rm -rf node_modules build
 npm install
 npm run build
@@ -524,7 +524,7 @@ echo "✅ Setup complete!"
 **Rebuild Only:**
 ```bash
 #!/bin/bash
-cd ~/Documents/Cline/MCP/qa-analysis-server
+cd ~/Documents/Cline/MCP/qa-analysis-mcp
 rm -rf build
 npm run build
 echo "✅ Rebuild complete!"
@@ -611,9 +611,9 @@ Add to MCP settings file:
 ```json
 {
   "mcpServers": {
-    "qa-analysis-server": {
+    "qa-analysis-mcp": {
       "command": "node",
-      "args": ["/path/to/qa-analysis-server/build/index.js"],
+      "args": ["/Users/employee/Documents/Cline/MCP/qa-analysis-mcp/build/index.js"],
       "env": {
         "JIRA_URL": "https://jira.paysera.net",
         "JIRA_EMAIL": "your.email@company.com",
@@ -654,9 +654,9 @@ Add to MCP settings file:
 ```json
 {
   "mcpServers": {
-    "qa-analysis-server": {
+    "qa-analysis-mcp": {
       "command": "node",
-      "args": ["/path/to/qa-analysis-server/build/index.js"],
+      "args": ["/path/to/qa-analysis-mcp/build/index.js"],
       "env": {
         "JIRA_URL": "https://jira.company.com",
         "JIRA_EMAIL": "your.email@company.com",
@@ -999,7 +999,7 @@ This repository includes security measures to prevent credential exposure:
 
 ```bash
 # 1. Navigate to project
-cd ~/Documents/Cline/MCP/qa-analysis-server
+cd ~/Documents/Cline/MCP/qa-analysis-mcp
 
 # 2. Verify .gitignore is working
 git status
@@ -1097,7 +1097,7 @@ npm run build
 ## Project File Structure
 
 ```
-qa-analysis-server/
+qa-analysis-mcp/
 ├── src/
 │   └── index.ts                 # Main server implementation
 ├── build/                       # Compiled JavaScript (ignored)

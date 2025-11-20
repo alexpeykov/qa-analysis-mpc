@@ -11,7 +11,7 @@ Please provide a comprehensive analysis of the following:
 
 ## Step 1: Analyze Using QA-Analysis MCP Tools
 
-Use the qa-analysis-server MCP tools to gather information:
+Use the qa-analysis-mcp MCP tools to gather information:
 
 1. **Analyze the Jira ticket** including:
    - Description and requirements

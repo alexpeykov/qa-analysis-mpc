@@ -1,8 +1,8 @@
 {
   "mcpServers": {
-    "qa-analysis-server": {
+    "qa-analysis-mcp": {
       "command": "node",
-      "args": ["/absolute/path/to/qa-analysis-server/build/index.js"],
+      "args": ["/Users/employee/Documents/Cline/MCP/qa-analysis-mcp/build/index.js"],
       "env": {
         "JIRA_URL": "https://jira.your-company.net",
         "JIRA_EMAIL": "your.email@company.com",
