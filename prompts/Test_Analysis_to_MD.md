@@ -2,12 +2,12 @@
 ⬇️ YOUR INPUT GOES HERE ⬇️
 ═══════════════════════════════════════════════════════════
 
-JIRA Ticket: https://jira.paysera.net/browse/CORE-5609
-GitLab MR Number: https://gitlab.paysera.net/paysera/app-evpbank/-/merge_requests/12041 https://gitlab.paysera.net/paysera/app-evpbank/-/merge_requests/12057
+JIRA Ticket: https://jira.paysera.net/browse/CORE-4050
+GitLab MR Number: https://gitlab.paysera.net/paysera/app-evpbank/-/merge_requests/11485
 
 Optional (leave as "none" if not applicable):
-- Related Tickets: https://jira.paysera.net/browse/EC-6763
-- Documentation URLs: none
+- Related Tickets: https://jira.paysera.net/browse/DATA-3412 https://jira.paysera.net/browse/CORE-4297 
+- Documentation URLs: https://gitlab.paysera.net/paysera/app-evpbank/-/merge_requests/12132
 
 ═══════════════════════════════════════════════════════════
 ⬆️ YOUR INPUT ENDS HERE ⬆️

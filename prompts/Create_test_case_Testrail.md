@@ -1,31 +1,96 @@
-Create test case in TestRail 5534 section:
+Create test case in TestRail 3280 - Assign partner on client merge section:
 
 Type: Functional
 Priority: High
 Generate acceptance criteria for each step.
 Create all of the following test cases without asking for approval for each one of them.
 
-Is the problem still present - shared DB problematic client 19110587 EVP0710018687132
-1.Switch to remote DB
-2.Verify if the problematic client from the ticket has status undetined
-The client’s status is not supposed to be unidentified.
+Verify if the client merge functionality works correctly after the changes - test branch
+1.Switch to local DB
+2.Find two clients - client #1 created before client #2. 
+3.Client #2 should have transfers created before the creation date of client #1
+4.Login as admin
+5.Go to admin panel/client merge
+6.Merge client 1 with client 2
+The clients are supposed to be merged successfully without any errors.
 
-Import SQL fixtures to local DB
-1.Switch to Local DB - evpbnak and mokejimai
-2.Import the SQL fixtures
-The fixtures are supposed to be imported without any errors. New client is supposed to be created in gateway.client - with status identified
+Merge 2 clients - same partner
+1.Switch to local DB
+2.Find two clients - client #1 created before client #2. 
+3.Client #2 should have transfers created before the creation date of client #1 - clients assigned to different parnters
+4.Login as admin
+5.Go to admin panel/client merge
+6.Merge client 1 with client 2
+7.Impersonate client 2
+8.Impersonate client 1
+9.Examine the list of transfers
+10.Switch to master branch and repeat steps 1-9
+On test branch client 2 should no longer be accessible. The transfers of client 1 should be visible under client 2.
+On master branch no transfers should be available under client #2
 
-Run the job publisher command and monitor outcome
-1.Switch to Local DB - evpbnak and mokejimai
-2.Run the job publisher
-3.Monitor the output of the command
-4.Check the level of the newly created client
-The command is supposed to be executed without any errors. The level is supposed to remain the same.
+Merge 2 clients - assigned to different partner
+1.Switch to local DB
+2.Find two clients - client #1 created before client #2 - clients assigned to different partners
+3.Client #2 should have transfers created before the creation date of client #1
+4.Login as admin
+5.Go to admin panel/client merge
+6.Merge client 1 with client 2
+7.Impersonate client 2
+8.Impersonate client 1
+9.Examine the list of transfers
+Client 2 should no longer be accessible. The transfers of client 1 should be visible under client 2
 
-Process the job and monitor consumer 
-1.Switch to Local DB - evpbnak and mokejimai
-2.Run the job consumer
-3.Monitor the output of the command
-4.Monitor the queue in Rabbit MQ
-5.Check the level of the newly created client
-The command is supposed to be executed without any errors. The level is supposed to remain the same. The messages are supposed to be created and then consumed in the queue without any errors.
+
+Verify the partner, that was assigned for the period between creation of client 1 and client 2
+1.Switch to local DB
+2.Find two clients - client #1 created before client #2 - clients assigned to different partners
+3.Client #2 should have transfers created before the creation date of client #1
+4.Go to the databse gateway.partner_client for entries with client_id of the clients that you are about to merge - client 1 and client 2
+5.Login as admin
+6.Go to admin panel/client merge
+7.Merge client 1 with client 2
+8.Go to the databse gateway.partner_client
+9.Go to the databse gateway.partner_client for entries with client_id of the clients that you are about to merge - client 1 and client 2
+The newly created entry which covers the period of activity of client two should be with partner_client - the partner of client 2.
+
+
+Verify if after the merge there is new entry in the gateway.partner_client table
+1.Switch to local DB
+2.Find two clients - client #1 created before client #2 - clients assigned to different partners
+3.Client #2 should have transfers created before the creation date of client #1
+4.Go to the databse gateway.partner_client for entries with client_id of the clients that you are about to merge - client 1 and client 2
+5.Login as admin
+6.Go to admin panel/client merge
+7.Merge client 1 with client 2
+8.Go to the databse gateway.partner_client
+9.Go to the databse gateway.partner_client for entries with client_id of the clients that you are about to merge - client 1 and client 2
+There should be newly created entry that covers the period between the creation date of client 1 and the creation date of client 2. 
+
+Do we keep the client name and info of the client, that we choose to keep 
+1.Switch to local DB
+2.Find two clients - client #1 created before client #2 
+3.Impersonate client 1 - check client’s name
+4.Impersonate client 2 - check client’s name
+5.Merge client 2 with client 1
+6.Examine the name of client 2
+The name of client 2 should remain the same before and after the merge
+
+Do we keep the accounts assigned to the client, that we keep
+1.Switch to local DB
+2.Find two clients - client #1 created before client #2 
+3.Impersonate client 1 - check client’s accounts
+4.Impersonate client 2 - check client’s accounts
+5.Merge client 2 with client 1
+6.Examine the name of client 2
+The name of client 2 should remain the same before and after the merge
+
+Do we update client info after merge
+1.Switch to local DB
+2.Find two clients - client #1 created before client #2 
+3.Impersonate client 2 - check client’s address
+4.Merge client 2 with client 1
+6.Examine the address of client 2
+The address of client 2 should remain the same before and after the merge
+
+
+

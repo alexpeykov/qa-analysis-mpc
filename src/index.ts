@@ -50,6 +50,13 @@ const EVP_LT_DATABASE = process.env.EVP_LT_DATABASE;
 const EVP_LT_USER = process.env.EVP_LT_USER;
 const EVP_LT_PASSWORD = process.env.EVP_LT_PASSWORD;
 
+// MySQL Environment variables - Gateway_REMOTE Database
+const GATEWAY_REMOTE_HOST = process.env.GATEWAY_REMOTE_HOST;
+const GATEWAY_REMOTE_PORT = process.env.GATEWAY_REMOTE_PORT ? parseInt(process.env.GATEWAY_REMOTE_PORT) : 3306;
+const GATEWAY_REMOTE_DATABASE = process.env.GATEWAY_REMOTE_DATABASE;
+const GATEWAY_REMOTE_USER = process.env.GATEWAY_REMOTE_USER;
+const GATEWAY_REMOTE_PASSWORD = process.env.GATEWAY_REMOTE_PASSWORD;
+
 // PostgreSQL Environment variables
 const POSTGRES_HOST = process.env.POSTGRES_HOST;
 const POSTGRES_PORT = process.env.POSTGRES_PORT ? parseInt(process.env.POSTGRES_PORT) : 5432;
@@ -79,6 +86,13 @@ const DB_CONFIGS: { [key: string]: { host: string; port: number; database: strin
     database: EVP_LT_DATABASE || '',
     user: EVP_LT_USER || '',
     password: EVP_LT_PASSWORD || '',
+  },
+  gateway_remote: {
+    host: GATEWAY_REMOTE_HOST || '',
+    port: GATEWAY_REMOTE_PORT,
+    database: GATEWAY_REMOTE_DATABASE || '',
+    user: GATEWAY_REMOTE_USER || '',
+    password: GATEWAY_REMOTE_PASSWORD || '',
   },
 };
 
@@ -1051,7 +1065,7 @@ class QAAnalysisServer {
               },
               database_name: {
                 type: "string",
-                enum: ["gateway", "evp_lt"],
+                enum: ["gateway", "evp_lt", "gateway_remote"],
                 description: "Database to query (default: gateway)",
               },
               limit: {
@@ -1070,7 +1084,7 @@ class QAAnalysisServer {
             properties: {
               database_name: {
                 type: "string",
-                enum: ["gateway", "evp_lt"],
+                enum: ["gateway", "evp_lt", "gateway_remote"],
                 description: "Database to list tables from (default: gateway)",
               },
             },
@@ -1089,7 +1103,7 @@ class QAAnalysisServer {
               },
               database_name: {
                 type: "string",
-                enum: ["gateway", "evp_lt"],
+                enum: ["gateway", "evp_lt", "gateway_remote"],
                 description: "Database containing the table (default: gateway)",
               },
             },
@@ -1108,7 +1122,7 @@ class QAAnalysisServer {
               },
               database_name: {
                 type: "string",
-                enum: ["gateway", "evp_lt"],
+                enum: ["gateway", "evp_lt", "gateway_remote"],
                 description: "Database containing the table (default: gateway)",
               },
               limit: {
