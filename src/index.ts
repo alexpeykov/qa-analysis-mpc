@@ -388,6 +388,10 @@ class QAAnalysisServer {
           inputSchema: {
             type: "object",
             properties: {
+              project_id: {
+                type: "number",
+                description: "TestRail project ID where section should be created",
+              },
               suite_id: {
                 type: "number",
                 description: "TestRail suite ID where section should be created",
@@ -396,12 +400,16 @@ class QAAnalysisServer {
                 type: "string",
                 description: "Section name",
               },
+              description: {
+                type: "string",
+                description: "Section description (optional)",
+              },
               parent_id: {
                 type: "number",
                 description: "Parent section ID (optional, for nested sections)",
               },
             },
-            required: ["suite_id", "name"],
+            required: ["project_id", "suite_id", "name"],
           },
         },
         {
@@ -410,12 +418,16 @@ class QAAnalysisServer {
           inputSchema: {
             type: "object",
             properties: {
+              project_id: {
+                type: "number",
+                description: "TestRail project ID",
+              },
               suite_id: {
                 type: "number",
                 description: "TestRail suite ID",
               },
             },
-            required: ["suite_id"],
+            required: ["project_id", "suite_id"],
           },
         },
         {
@@ -1900,11 +1912,15 @@ class QAAnalysisServer {
     }
 
     const suiteId = Number(args.suite_id);
-    const projectId = args.project_id || 14; // Default to project 14
+    const projectId = Number(args.project_id);
     const payload: any = {
       suite_id: suiteId,
       name: String(args.name),
     };
+
+    if (args.description) {
+      payload.description = String(args.description);
+    }
 
     if (args.parent_id) {
       payload.parent_id = Number(args.parent_id);
@@ -1928,8 +1944,8 @@ class QAAnalysisServer {
     }
 
     const suiteId = Number(args.suite_id);
-    const projectId = args.project_id || 14; // Default to project 14
-    const response = await this.testrailClient.get(`/get_sections/${projectId}?suite_id=${suiteId}`);
+    const projectId = Number(args.project_id);
+    const response = await this.testrailClient.get(`/get_sections/${projectId}&suite_id=${suiteId}`);
 
     return {
       content: [
