@@ -2,12 +2,12 @@
 ⬇️ YOUR INPUT GOES HERE ⬇️
 ═══════════════════════════════════════════════════════════
 
-JIRA Ticket: https://jira.paysera.net/browse/CORE-4050
-GitLab MR Number: https://gitlab.paysera.net/paysera/app-evpbank/-/merge_requests/11485
+JIRA Ticket: https://jira.paysera.net/browse/CORE-5440
+GitLab MR Number: https://gitlab.paysera.net/paysera/app-mokejimai/-/merge_requests/13045 https://gitlab.paysera.net/paysera/app-mokejimai/-/merge_requests/12998
 
 Optional (leave as "none" if not applicable):
-- Related Tickets: https://jira.paysera.net/browse/DATA-3412 https://jira.paysera.net/browse/CORE-4297 
-- Documentation URLs: https://gitlab.paysera.net/paysera/app-evpbank/-/merge_requests/12132
+- Related Tickets: https://jira.paysera.net/browse/AC-740
+- Documentation URLs: none
 
 ═══════════════════════════════════════════════════════════
 ⬆️ YOUR INPUT ENDS HERE ⬆️

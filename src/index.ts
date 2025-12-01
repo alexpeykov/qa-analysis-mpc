@@ -748,6 +748,10 @@ class QAAnalysisServer {
                 type: "string",
                 description: "Test run description",
               },
+              refs: {
+                type: "string",
+                description: "Reference (e.g., Jira ticket references like 'CORE-1234')",
+              },
               include_all: {
                 type: "boolean",
                 description: "Include all test cases from the suite",
@@ -2200,6 +2204,7 @@ class QAAnalysisServer {
     const payload: any = { name: String(args.name) };
     if (args.suite_id) payload.suite_id = Number(args.suite_id);
     if (args.description) payload.description = String(args.description);
+    if (args.refs) payload.refs = String(args.refs);
     if (args.include_all !== undefined) payload.include_all = Boolean(args.include_all);
     if (args.case_ids) payload.case_ids = args.case_ids;
     const response = await this.testrailClient.post(`/add_run/${projectId}`, payload);
